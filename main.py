@@ -20,7 +20,7 @@ import utils
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "static" / "uploads"
-MAX_PHOTO_BYTES = 5 * 1024 * 1024
+MAX_PHOTO_BYTES = 2 * 1024 * 1024
 
 FOOD_TYPES = ["Veg", "Non-veg", "Eggetarian"]
 OBJECTIVES = ["Fat loss", "Muscle gain", "General fitness", "Weight gain"]
@@ -55,10 +55,21 @@ def create_first_admin():
     )
 
 
+def ensure_role_column():
+    """admins.role = 'admin' (everything) or 'receptionist' (no payments).
+    Added here once, so db/schema.sql stays unchanged. Existing logins become admins."""
+    if db.fetch_one("SELECT 1 FROM information_schema.columns "
+                    "WHERE table_name = 'admins' AND column_name = 'role'"):
+        return
+    db.execute("ALTER TABLE admins ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin' "
+               "CHECK (role IN ('admin', 'receptionist'))")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     check_secret_key()
     db.pool.open(wait=True, timeout=10)
+    ensure_role_column()
     create_first_admin()
     yield
     db.pool.close()
@@ -69,7 +80,12 @@ app.add_middleware(SessionMiddleware, secret_key=utils.SECRET_KEY, max_age=utils
                    same_site="lax", https_only=utils.COOKIE_SECURE)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
-templates = Jinja2Templates(directory=BASE_DIR / "templates")
+def user_context(request: Request) -> dict:
+    """Every template (pages and HTMX partials) knows if payments may be shown."""
+    return {"is_admin": getattr(request.state, "role", "") == "admin"}
+
+
+templates = Jinja2Templates(directory=BASE_DIR / "templates", context_processors=[user_context])
 templates.env.filters.update(
     inr=utils.inr, inr_short=utils.inr_short, dmy=utils.fmt_date, short=utils.fmt_short,
     long=utils.fmt_long, days_label=utils.days_label, mask_aadhaar=utils.mask_aadhaar,
@@ -90,9 +106,21 @@ class LoginRequired(Exception):
 
 
 def login_required(request: Request):
-    if not utils.is_logged_in(request.session):
+    """Role is read fresh every request, so a role change or a blocked login works at once."""
+    user = None
+    if utils.is_logged_in(request.session):
+        user = db.fetch_one("SELECT role FROM admins WHERE id = %s AND is_active",
+                            (request.session["admin_id"],))
+    if not user:
         request.session.clear()
         raise LoginRequired
+    request.state.role = user["role"]
+
+
+def admin_only(request: Request):
+    """Payments (renew / mark paid) – not for the receptionist."""
+    if request.state.role != "admin":
+        raise HTTPException(status_code=403)
 
 
 @app.exception_handler(LoginRequired)
@@ -104,7 +132,7 @@ async def go_to_login(request: Request, exc: LoginRequired):
 
 def error_page(request: Request, status_code: int):
     """Plain page without DB calls, so it also works when the database is down."""
-    title = "Page not found" if status_code == 404 else "Something went wrong"
+    title = {404: "Page not found", 403: "Not allowed"}.get(status_code, "Something went wrong")
     return templates.TemplateResponse(request, "error.html", {"code": status_code, "title": title},
                                       status_code=status_code)
 
@@ -310,7 +338,7 @@ def read_photo(upload) -> tuple[bytes | None, str | None, str | None]:
     if not data:
         return None, None, None
     if len(data) > MAX_PHOTO_BYTES:
-        return None, None, "Photo must be 5 MB or smaller"
+        return None, None, "Photo must be smaller than 2 MB"
     ext = photo_ext(data)
     if not ext:
         return None, None, "Photo must be a JPG, PNG or WEBP image"
@@ -526,7 +554,7 @@ def member_page(request: Request, member: dict, status_code: int = 200, return_t
     query = request.query_params
     if not return_to and query.get("back") == "reminders":
         return_to = reminders_url(query.get("tab", "due"), query.get("show", ""))
-    payments = get_payments(member["id"])
+    payments = get_payments(member["id"]) if request.state.role == "admin" else []
     context = dict(
         m=member, member_name=utils.full_name(member["first_name"], member["last_name"]),
         payments=payments, total_paid=sum(p["amount"] for p in payments), packages=get_packages(),
@@ -607,7 +635,7 @@ def renew_member(member_id: int, v: dict, package: dict) -> tuple[date, date] | 
     return params["start_date"], params["end_date"]
 
 
-@router.post("/members/{member_id:int}/renew")
+@router.post("/members/{member_id:int}/renew", dependencies=[Depends(admin_only)])
 def renew(request: Request, member_id: int, form=Depends(form_data)):
     member = member_or_redirect(request, member_id)
     if not member:
@@ -728,7 +756,8 @@ def logout(request: Request):
 def dashboard_summary() -> dict:
     """All card numbers in one query (same rules as db/common_queries.sql)."""
     return db.fetch_one(
-        f"""SELECT COUNT(*) FILTER (WHERE {utils.STATUS_WHERE['active']}) AS active,
+        f"""SELECT COUNT(*) AS total,
+                   COUNT(*) FILTER (WHERE {utils.STATUS_WHERE['active']}) AS active,
                    COUNT(*) FILTER (WHERE {utils.STATUS_WHERE['due']}) AS due,
                    COUNT(*) FILTER (WHERE m.end_date < CURRENT_DATE
                                       AND m.end_date >= CURRENT_DATE - %(recent)s::int) AS expired,
@@ -781,4 +810,110 @@ def change_password(request: Request, current: str = Form(""), new: str = Form("
     return redirect("/")
 
 
+# ---------- staff: receptionist logins (owner only) ----------
+
+staff_router = APIRouter(dependencies=[Depends(login_required), Depends(admin_only)])
+
+STAFF_SELECT = "SELECT id, name, username, is_active FROM admins WHERE role = 'receptionist'"
+USERNAME_RE = r"[A-Za-z0-9._-]{3,50}"
+
+
+def get_staff() -> list[dict]:
+    return db.fetch_all(STAFF_SELECT + " ORDER BY name, id")
+
+
+def get_receptionist(staff_id: int) -> dict | None:
+    return db.fetch_one(STAFF_SELECT + " AND id = %s", (staff_id,))
+
+
+def username_taken(username: str, exclude_id: int = 0) -> bool:
+    return bool(db.fetch_one("SELECT 1 FROM admins WHERE lower(username) = lower(%s) AND id <> %s",
+                             (username, exclude_id)))
+
+
+def clean_staff(form, staff_id: int = 0) -> tuple[dict, dict]:
+    """Name, username, password (password optional when editing = keep the old one)."""
+    v = {k: str(form.get(k) or "").strip() for k in ("name", "username")}
+    password = str(form.get("password") or "")
+    checks = [
+        ("name", 0 < len(v["name"]) <= 100, "Enter a name"),
+        ("username", re.fullmatch(USERNAME_RE, v["username"]),
+         "3–50 letters, numbers, dot, dash or underscore (no spaces)"),
+        ("password", (staff_id and not password) or len(password) >= 8, "Password must be at least 8 characters"),
+    ]
+    errors = {name: msg for name, ok, msg in checks if not ok}
+    if "username" not in errors and username_taken(v["username"], staff_id):
+        errors["username"] = "This username is already used"
+    return v | {"password": password}, errors
+
+
+def staff_page(request: Request, v: dict, errors: dict, editing: dict | None = None, status_code: int = 200):
+    return render(request, "staff.html", nav="staff", status_code=status_code,
+                  staff=get_staff(), v=v, errors=errors, editing=editing)
+
+
+def staff_or_redirect(request: Request, staff_id: int):
+    person = get_receptionist(staff_id)
+    if not person:
+        flash(request, "Receptionist not found", "error")
+    return person
+
+
+@staff_router.get("/staff")
+def staff_list(request: Request):
+    return staff_page(request, {}, {})
+
+
+@staff_router.post("/staff")
+def staff_create(request: Request, form=Depends(form_data)):
+    v, errors = clean_staff(form)
+    if errors:
+        return staff_page(request, v, errors, status_code=400)
+    db.execute("INSERT INTO admins (name, username, password_hash, role) VALUES (%s, %s, %s, 'receptionist')",
+               (v["name"], v["username"], utils.hash_password(v["password"])))
+    flash(request, f"Receptionist added – login: {v['username']}")
+    return redirect("/staff")
+
+
+@staff_router.get("/staff/{staff_id:int}/edit")
+def staff_edit_form(request: Request, staff_id: int):
+    person = staff_or_redirect(request, staff_id)
+    return staff_page(request, person, {}, editing=person) if person else redirect("/staff")
+
+
+@staff_router.post("/staff/{staff_id:int}/edit")
+def staff_edit(request: Request, staff_id: int, form=Depends(form_data)):
+    person = staff_or_redirect(request, staff_id)
+    if not person:
+        return redirect("/staff")
+    v, errors = clean_staff(form, staff_id)
+    if errors:
+        return staff_page(request, v, errors, editing=person, status_code=400)
+    db.execute("UPDATE admins SET name = %s, username = %s WHERE id = %s", (v["name"], v["username"], staff_id))
+    if v["password"]:
+        db.execute("UPDATE admins SET password_hash = %s WHERE id = %s", (utils.hash_password(v["password"]), staff_id))
+    flash(request, f"{v['name']} updated" + (" – new password set" if v["password"] else ""))
+    return redirect("/staff")
+
+
+@staff_router.post("/staff/{staff_id:int}/block")
+def staff_block(request: Request, staff_id: int):
+    """Block / unblock. A blocked receptionist is logged out on their next click."""
+    person = staff_or_redirect(request, staff_id)
+    if person:
+        db.execute("UPDATE admins SET is_active = NOT is_active WHERE id = %s", (staff_id,))
+        flash(request, f"{person['name']} " + ("blocked" if person["is_active"] else "unblocked"))
+    return redirect("/staff")
+
+
+@staff_router.post("/staff/{staff_id:int}/delete")
+def staff_delete(request: Request, staff_id: int):
+    person = staff_or_redirect(request, staff_id)
+    if person:
+        db.execute("DELETE FROM admins WHERE id = %s AND role = 'receptionist'", (staff_id,))
+        flash(request, f"{person['name']} deleted")
+    return redirect("/staff")
+
+
 app.include_router(router)
+app.include_router(staff_router)

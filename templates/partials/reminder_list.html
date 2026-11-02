@@ -18,8 +18,9 @@
 </a>
 {%- endmacro %}
 
+{# Payments are admin only – the receptionist just sends reminders. #}
 {% macro mark_paid(r, cls="") -%}
-<a href="/members/{{ r.id }}?renew=1&back=reminders&tab={{ tab }}{{ '&show=all' if show }}" class="btn-outline {{ cls }}">Mark paid</a>
+{% if is_admin %}<a href="/members/{{ r.id }}?renew=1&back=reminders&tab={{ tab }}{{ '&show=all' if show }}" class="btn-outline {{ cls }}">Mark paid</a>{% endif %}
 {%- endmacro %}
 
 {# ---------- tabs (inside the black header area on mobile) ---------- #}
@@ -47,8 +48,13 @@
 {# ---------- summary ---------- #}
 <div class="card p-4 md:p-5 mb-4 flex items-center justify-between gap-4">
   <div>
+    {% if is_admin %}
     <p class="text-xs md:text-sm font-semibold text-muted">Fee to collect ({{ "next " ~ reminder_days ~ " days" if tab == "due" else ("all expired" if show else "expired, last " ~ recent_days ~ " days") }})</p>
     <p class="font-head font-semibold text-3xl leading-tight">{{ to_collect | inr }}</p>
+    {% else %}
+    <p class="text-xs md:text-sm font-semibold text-muted">Members to remind</p>
+    <p class="font-head font-semibold text-3xl leading-tight">{{ rows | length }}</p>
+    {% endif %}
   </div>
   <p class="text-right text-sm text-muted leading-tight">
     <span class="text-2xl font-bold text-zinc-900" data-sent-count>{{ sent_count }}</span> / {{ rows | length }}<br>reminders sent
@@ -65,7 +71,7 @@
           <th class="px-3 py-3 font-semibold">Ends on</th>
           <th class="px-3 py-3 font-semibold">Renewal fee</th>
           <th class="px-3 py-3 font-semibold">Reminder</th>
-          <th class="px-3 py-3"><span class="sr-only">Mark paid</span></th>
+          {% if is_admin %}<th class="px-3 py-3"><span class="sr-only">Mark paid</span></th>{% endif %}
         </tr>
       </thead>
       <tbody class="divide-y divide-zinc-100">
@@ -82,7 +88,7 @@
             {{ send_button(r, "w-full px-3") }}
             <p class="mt-1 text-xs text-muted text-center" data-sent-label="{{ r.id }}">{{ sent_label(r.last_reminder_at) }}</p>
           </td>
-          <td class="px-3 py-3">{{ mark_paid(r, "px-3") }}</td>
+          {% if is_admin %}<td class="px-3 py-3">{{ mark_paid(r, "px-3") }}</td>{% endif %}
         </tr>
         {% endfor %}
       </tbody>

@@ -9,7 +9,8 @@
     <p class="mt-6 font-head font-semibold text-6xl text-brand">{{ code }}</p>
     <h1 class="mt-1 font-head font-semibold uppercase text-2xl tracking-wide">{{ title }}</h1>
     <p class="mt-2 text-sm text-muted">
-      {% if code == 404 %}This page does not exist or was moved.{% else %}Please try again. If it keeps happening, restart the app and check the console.{% endif %}
+      {% if code == 404 %}This page does not exist or was moved.
+      {% elif code == 403 %}Your login cannot do this. Payments are handled by the owner.{% else %}Please try again. If it keeps happening, restart the app and check the console.{% endif %}
     </p>
     <a href="/" class="btn-primary w-full mt-6 !min-h-[50px]">Go to dashboard</a>
   </div>

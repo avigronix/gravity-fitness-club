@@ -77,7 +77,58 @@ Change the test number later (all members):
 psql -d gym_admin -c "UPDATE members SET mobile = '9XXXXXXXXX'"
 ```
 
-## 3. Testing (what to check by hand)
+## 3. Logins and roles (owner / receptionist)
+
+| Role | Can do | Cannot see / do |
+|---|---|---|
+| `admin` (owner) | everything | – |
+| `receptionist` | dashboard, **new registration**, all members (search, view, edit personal details), **send WhatsApp reminders**, call, change own password | money collected, fee paid, payment history, "Fee to collect", **Renew / Mark paid** |
+
+The receptionist still types the fee and payment mode on the registration form (that is the joining
+payment) and the reminder message still says the renewal fee – that is what the member must pay.
+
+The `role` column is added to `admins` automatically the first time the app starts
+(existing logins stay `admin`). If you add a receptionist before ever starting the app, run first:
+`ALTER TABLE admins ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin' CHECK (role IN ('admin', 'receptionist'));`
+
+**Easiest: the Staff page.** Log in as owner → sidebar **Staff** (phone: *More* → *Staff*).
+Add a receptionist (name, login username, password), edit name / username / password,
+**Block / Unblock** (a blocked login is logged out on the next click) and delete.
+Only receptionists are listed there – owner logins are managed with SQL below.
+
+**By SQL instead** – first make a password hash (run in the project folder):
+
+```bash
+source venv/bin/activate            # Windows: venv\Scripts\activate
+python -c "import bcrypt; print(bcrypt.hashpw(b'Desk@12345', bcrypt.gensalt()).decode())"
+```
+
+Then open psql (`psql -d gym_admin`, Windows: `psql -U postgres -d gym_admin`; on the server
+use the same URL as `DATABASE_URL`) and paste the hash in single quotes:
+
+```sql
+INSERT INTO admins (name, username, password_hash, role)
+VALUES ('Front Desk', 'reception', '<paste-hash-here>', 'receptionist');
+```
+
+Type SQL with a hash inside psql, not inside `psql -c "..."` – the shell would eat the `$` signs.
+
+**Update** (all inside psql, work at once – the role is checked on every page):
+
+```sql
+SELECT id, name, username, role, is_active FROM admins;                     -- list logins
+UPDATE admins SET password_hash = '<new-hash>' WHERE username = 'reception'; -- reset password
+UPDATE admins SET name = 'Priya' WHERE username = 'reception';              -- change name
+UPDATE admins SET role = 'admin' WHERE username = 'reception';              -- make owner
+UPDATE admins SET role = 'receptionist' WHERE username = 'reception';       -- back to receptionist
+UPDATE admins SET is_active = FALSE WHERE username = 'reception';           -- block (logged out at once)
+UPDATE admins SET is_active = TRUE  WHERE username = 'reception';           -- unblock
+DELETE FROM admins WHERE username = 'reception';                            -- remove login
+```
+
+The receptionist can also change their own password after login (More → Change password).
+
+## 4. Testing (what to check by hand)
 
 1. Open `/` without logging in → you land on `/login`. Wrong password → red error; 5 wrong tries → blocked 10 minutes.
 2. **New Registration**: 1 Month from 31 Oct shows end date 30 Nov; save → member page with one payment row.
@@ -87,7 +138,7 @@ psql -d gym_admin -c "UPDATE members SET mobile = '9XXXXXXXXX'"
 5. **Dashboard** numbers = the "Count by status" and "Collection this month" queries in `db/common_queries.sql`.
 6. Phone: bottom tab bar, red + button, cards instead of tables, renew bottom sheet.
 
-## 4. Go-live checklist
+## 5. Go-live checklist
 
 - [ ] **Clear demo data** – in psql run the "CLEAR ALL MEMBER DATA BEFORE GO-LIVE" line from
       `db/common_queries.sql` (`TRUNCATE payments, members RESTART IDENTITY CASCADE;`). Admins and package
@@ -101,16 +152,16 @@ psql -d gym_admin -c "UPDATE members SET mobile = '9XXXXXXXXX'"
       Back up `static/uploads/` (member photos) too.
 - [ ] Check package prices: `SELECT name, price FROM packages;` (change with the queries in `db/common_queries.sql`).
 
-## 5. Files
+## 6. Files
 
 ```
 main.py              FastAPI app + all routes
 db.py                connection pool (Asia/Kolkata on every connection) + query helpers
 utils.py             passwords, login limit, dates, end-date rule, money, WhatsApp messages
-templates/           base, login, dashboard, register, members, member, reminders, password, error
+templates/           base, login, dashboard, register, members, member, reminders, password, staff, error
 templates/partials/  members_list, reminder_list (HTMX swaps), member_form, mobile_check, ui (icons/macros)
 static/app.js        end-date preview, renew confirm, reminder "sent" logging, sheets
-static/uploads/      member photos (<member id>.jpg/png/webp)
+static/uploads/      member photos (<member id>.jpg/png/webp, under 2 MB – big phone photos are shrunk in the browser)
 db/schema.sql        tables + packages (do not change)
 db/common_queries.sql  everyday SQL: status, reminders, renew, collection, clear data, backup
 db/seed_demo.sql     demo data

@@ -43,6 +43,7 @@
     <p class="text-xs md:text-sm text-muted">Last {{ recent_days }} days · {{ s.expired_all }} in total</p>
   </a>
 
+  {% if is_admin %}
   <div class="order-2 md:order-none card p-4 md:p-5">
     <p class="text-xs md:text-sm font-semibold text-muted md:uppercase md:tracking-wide">Collected ({{ today.strftime("%b") }})</p>
     <p class="font-head font-semibold text-4xl md:text-5xl leading-tight mt-1">
@@ -50,6 +51,13 @@
     </p>
     <p class="text-xs md:text-sm text-muted">From {{ s.payments }} payment{{ "" if s.payments == 1 else "s" }}</p>
   </div>
+  {% else %}
+  <a href="/members" class="order-2 md:order-none card p-4 md:p-5 hover:ring-2 hover:ring-zinc-200 transition">
+    <p class="text-xs md:text-sm font-semibold text-muted md:uppercase md:tracking-wide">All members</p>
+    <p class="font-head font-semibold text-4xl md:text-5xl leading-tight mt-1">{{ s.total }}</p>
+    <p class="text-xs md:text-sm text-muted">Search &amp; view details</p>
+  </a>
+  {% endif %}
 
   <a href="/members/new" class="order-4 md:hidden card bg-ink text-white p-4 flex flex-col justify-between min-h-[120px] active:scale-[.98] transition">
     <span class="w-10 h-10 grid place-items-center rounded-xl bg-brand">{{ icon("plus") }}</span>

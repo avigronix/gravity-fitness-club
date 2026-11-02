@@ -112,8 +112,34 @@ document.addEventListener("change", (e) => {
       img.src = URL.createObjectURL(file);
       img.classList.remove("hidden");
     }
+    if (file && file.size > PHOTO_MAX_BYTES) shrinkPhoto(e.target, file);
   }
 });
+
+// ---------- member photo: phone camera photos are often 3–6 MB, server allows < 2 MB ----------
+
+const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+const PHOTO_MAX_SIDE = 1200;
+
+// Re-draw a big photo as a smaller JPEG and put it back into the file input
+function shrinkPhoto(input, file) {
+  const img = new Image();
+  img.onload = () => {
+    const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob || typeof DataTransfer === "undefined") return; // server will show the size error
+      const files = new DataTransfer();
+      files.items.add(new File([blob], "photo.jpg", { type: "image/jpeg" }));
+      input.files = files.files;
+    }, "image/jpeg", 0.85);
+    URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(file);
+}
 
 document.addEventListener("input", (e) => {
   const form = e.target.closest("[data-package-form]");
@@ -129,6 +155,8 @@ function renewSummary(form) {
 // Stop double taps creating two members / payments
 document.addEventListener("submit", (e) => {
   const form = e.target;
+  // e.g. <form data-confirm="Delete Priya?"> (staff block / delete)
+  if (form.dataset.confirm && !confirm(form.dataset.confirm)) return e.preventDefault();
   if (!form.matches("[data-submit-once]")) return;
   if (form.dataset.sending) return e.preventDefault();
   if (form.matches("[data-renew-form]") && !confirm(renewSummary(form) + "\n\nSave this payment?")) {

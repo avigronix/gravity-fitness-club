@@ -24,7 +24,9 @@
   {% if not editing %}
   <div class="flex gap-3">
     <a href="/members/{{ m.id }}/edit" class="btn-outline px-5">{{ icon("pencil", "w-4 h-4") }} Edit</a>
+    {% if is_admin %}
     <button type="button" data-open="renew-sheet" class="btn-primary px-5">{{ icon("renew", "w-4 h-4") }} Renew / Mark paid</button>
+    {% endif %}
   </div>
   {% endif %}
 </div>
@@ -41,7 +43,7 @@
   {{ personal_card(v, errors, duplicates, photo_url=("/static/uploads/" ~ m.photo) if m.photo else "", exclude_id=m.id) }}
   {{ body_card(v, errors) }}
   {{ medical_card(v, errors) }}
-  <p class="text-sm text-muted px-1">Package, dates and fee change only through <b>Renew / Mark paid</b>.</p>
+  <p class="text-sm text-muted px-1">Package, dates and fee change only through <b>Renew / Mark paid</b>{{ " (owner login)" if not is_admin }}.</p>
 
   <div class="hidden md:flex justify-end gap-3">
     <a href="/members/{{ m.id }}" class="btn-outline px-6">Cancel</a>
@@ -73,8 +75,10 @@
   <div class="mt-4 grid grid-cols-2 md:flex gap-2">
     <a href="tel:+91{{ m.mobile }}" class="btn-outline">{{ icon("phone", "w-4 h-4") }} Call</a>
     <a href="{{ member_wa_link(m) }}" target="_blank" rel="noopener" class="btn-wa">{{ icon("whatsapp", "w-4 h-4") }} WhatsApp</a>
-    <a href="/members/{{ m.id }}/edit" class="btn-outline md:hidden">{{ icon("pencil", "w-4 h-4") }} Edit</a>
+    <a href="/members/{{ m.id }}/edit" class="btn-outline md:hidden {{ 'col-span-2' if not is_admin }}">{{ icon("pencil", "w-4 h-4") }} Edit</a>
+    {% if is_admin %}
     <button type="button" data-open="renew-sheet" class="btn-primary md:hidden">{{ icon("renew", "w-4 h-4") }} Renew</button>
+    {% endif %}
   </div>
 </section>
 
@@ -85,7 +89,7 @@
       {{ row("Package", m.package) }}
       {{ row("Start date", m.start_date | dmy) }}
       {{ row("End date", m.end_date | dmy) }}
-      {{ row("Fee paid", m.fee | inr) }}
+      {% if is_admin %}{{ row("Fee paid", m.fee | inr) }}{% endif %}
       {{ row("Renewal fee", m.renewal_fee | inr) }}
       {{ row("Last reminder", m.last_reminder_at.strftime("%d %b %Y, %I:%M %p") if m.last_reminder_at else "") }}
     </dl>
@@ -125,6 +129,7 @@
   </section>
 </div>
 
+{% if is_admin %}
 {# ---------- payment history ---------- #}
 <section class="card p-4 md:p-6 mt-4">
   <div class="flex items-baseline justify-between gap-4 mb-2">
@@ -187,6 +192,7 @@
     </div>
   </form>
 </dialog>
+{% endif %}{# is_admin #}
 {% endif %}
 {% endblock %}
 

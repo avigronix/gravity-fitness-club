@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon, mobile_bar, field %}
+{% block title %}Staff{% endblock %}
+
+{% block mobile_header %}
+<header class="md:hidden bg-ink text-white px-4 pt-[calc(env(safe-area-inset-top)+12px)] pb-4">
+  {{ mobile_bar("Staff", "Receptionist logins", back="/") }}
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="hidden md:block mb-6">
+  <p class="text-sm text-muted">Receptionists can register members and send reminders – no payments</p>
+  <h1 class="page-title">Staff</h1>
+</div>
+
+<div class="grid lg:grid-cols-[1fr_380px] gap-4 md:gap-6 items-start">
+  {# ---------- receptionist list ---------- #}
+  <section class="card p-4 md:p-6">
+    <h2 class="section-title mb-2">Receptionists ({{ staff | length }})</h2>
+    <ul class="divide-y divide-zinc-100">
+      {% for s in staff %}
+      <li class="py-3 flex flex-wrap items-center gap-3">
+        <div class="avatar w-10 h-10 text-sm {{ '' if s.is_active else 'bg-zinc-400' }}">{{ s.name[:1] | upper }}</div>
+        <div class="flex-1 min-w-[140px]">
+          <p class="font-semibold truncate">{{ s.name }}
+            <span class="badge {{ 'badge-active' if s.is_active else 'badge-expired' }} ml-1">{{ "Active" if s.is_active else "Blocked" }}</span>
+          </p>
+          <p class="text-xs text-muted truncate">Login: {{ s.username }}</p>
+        </div>
+        <div class="flex gap-2">
+          <a href="/staff/{{ s.id }}/edit" class="btn-outline btn-icon" aria-label="Edit {{ s.name }}">{{ icon("pencil", "w-4 h-4") }}</a>
+          <form method="post" action="/staff/{{ s.id }}/block"
+                data-confirm="{{ ('Block ' ~ s.name ~ '? They will be logged out and cannot log in.') if s.is_active else ('Unblock ' ~ s.name ~ '?') }}">
+            <button class="btn-outline px-3 {{ 'text-brand' if s.is_active }}">{{ "Block" if s.is_active else "Unblock" }}</button>
+          </form>
+          <form method="post" action="/staff/{{ s.id }}/delete" data-confirm="Delete {{ s.name }} permanently?">
+            <button class="btn-outline btn-icon text-brand" aria-label="Delete {{ s.name }}">{{ icon("x", "w-4 h-4") }}</button>
+          </form>
+        </div>
+      </li>
+      {% else %}
+      <li class="py-6 text-center text-sm text-muted">No receptionist yet. Add one with the form.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  {# ---------- add / edit form ---------- #}
+  <form method="post" action="{{ '/staff/' ~ editing.id ~ '/edit' if editing else '/staff' }}" novalidate data-submit-once
+        class="card p-4 md:p-6 space-y-4 {{ 'ring-2 ring-brand' if editing }}">
+    <h2 class="section-title">{{ "Edit " ~ editing.name if editing else "Add receptionist" }}</h2>
+    {{ field("name", "Name", v, errors, "e.g. Priya", required=True, attrs='autocomplete="off"') }}
+    {{ field("username", "Login username", v, errors, "e.g. priya", required=True, attrs='autocomplete="off" autocapitalize="none"') }}
+    {{ field("password", "New password" if editing else "Password", {}, errors,
+             "Leave blank to keep the old one" if editing else "At least 8 characters",
+             type="password", required=not editing, attrs='autocomplete="new-password"') }}
+    <div class="flex gap-3 pt-1">
+      {% if editing %}<a href="/staff" class="btn-outline px-5 !min-h-[50px]">Cancel</a>{% endif %}
+      <button class="btn-save flex-1 !min-h-[50px]">{{ "Save changes" if editing else "Add receptionist" }}</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

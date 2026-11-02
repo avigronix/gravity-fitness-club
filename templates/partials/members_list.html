@@ -35,7 +35,7 @@
         <th class="px-3 py-3 font-semibold">Package</th>
         <th class="px-3 py-3 font-semibold">Start</th>
         <th class="px-3 py-3 font-semibold">End</th>
-        <th class="px-3 py-3 font-semibold">Fee</th>
+        {% if is_admin %}<th class="px-3 py-3 font-semibold">Fee</th>{% endif %}
         <th class="px-3 py-3 font-semibold">Status</th>
         <th class="px-3 py-3 font-semibold">Action</th>
       </tr>
@@ -49,7 +49,7 @@
         <td class="px-3 py-3 whitespace-nowrap">{{ m.package }}</td>
         <td class="px-3 py-3 whitespace-nowrap">{{ m.start_date | dmy }}</td>
         <td class="px-3 py-3 whitespace-nowrap">{{ m.end_date | dmy }}</td>
-        <td class="px-3 py-3 whitespace-nowrap">{{ m.fee | inr }}</td>
+        {% if is_admin %}<td class="px-3 py-3 whitespace-nowrap">{{ m.fee | inr }}</td>{% endif %}
         <td class="px-3 py-3">{{ status_badge(m.status) }}</td>
         <td class="px-3 py-2">
           <div class="flex gap-2">

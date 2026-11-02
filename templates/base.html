@@ -71,7 +71,7 @@
     ("register", "/members/new", "New Registration", "user-plus"),
     ("members", "/members", "All Members", "list"),
     ("reminders", "/reminders", "Payment Reminders", "bell"),
-  ] %}
+  ] + ([("staff", "/staff", "Staff", "users")] if is_admin else []) %}
   <aside class="hidden md:flex fixed inset-y-0 left-0 z-30 w-60 bg-ink text-zinc-300 flex-col px-4 py-6">
     <a href="/" class="block mx-auto mb-8">
       <img src="/static/logo.jpg" alt="{{ gym_name }}" class="w-36 rounded-lg ring-1 ring-white/10">
@@ -176,7 +176,7 @@
         <div class="avatar w-11 h-11">{{ admin_name[:1] | upper }}</div>
         <div>
           <p class="font-semibold">{{ admin_name }}</p>
-          <p class="text-xs text-muted">{{ gym_name }}</p>
+          <p class="text-xs text-muted">{{ "Owner" if is_admin else "Receptionist" }} · {{ gym_name }}</p>
         </div>
       </div>
       <nav class="py-2">
