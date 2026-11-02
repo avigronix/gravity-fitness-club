@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GYM_NAME = os.getenv("GYM_NAME", "Gravity Fitness Club")
+GYM_ADDRESS = os.getenv("GYM_ADDRESS", "")      # printed on receipts (optional)
+GYM_PHONE = os.getenv("GYM_PHONE", "")
 REMINDER_DAYS = int(os.getenv("REMINDER_DAYS", "2"))
 RECENT_EXPIRED_DAYS = 30    # "Expired" tab + badge only count members who left in the last 30 days
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
@@ -173,6 +175,27 @@ def inr_short(amount) -> str:
     if amount < 100000:
         return f"₹{amount / 1000:.1f}".rstrip("0").rstrip(".") + "k"
     return f"₹{amount / 100000:.2f}".rstrip("0").rstrip(".") + "L"
+
+
+_ONES = ("", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven",
+         "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen")
+_TENS = ("", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety")
+
+
+def _below_100(n: int) -> str:
+    return _ONES[n] if n < 20 else f"{_TENS[n // 10]} {_ONES[n % 10]}".strip()
+
+
+def rupees_in_words(amount) -> str:
+    """2500 -> 'Rupees Two Thousand Five Hundred Only' (Indian system: lakh, crore)."""
+    n, parts = int(amount or 0), []
+    for size, name in ((10_000_000, "Crore"), (100_000, "Lakh"), (1000, "Thousand"), (100, "Hundred")):
+        count, n = divmod(n, size)
+        if count:
+            parts.append(f"{_below_100(count)} {name}")
+    if n:
+        parts.append(_below_100(n))
+    return "Rupees " + (" ".join(parts) or "Zero") + " Only"
 
 
 def mask_aadhaar(aadhaar) -> str:

@@ -9,6 +9,9 @@ document.addEventListener("click", (e) => {
   if (e.target.tagName === "DIALOG") e.target.close();
   if (e.target.closest("[data-close-dialog]")) e.target.closest("dialog")?.close();
 
+  // Receipt: print, or "Save as PDF" in the print dialog (phone too)
+  if (e.target.closest("[data-print]")) window.print();
+
   // Close flash message
   if (e.target.closest("[data-close-flash]")) e.target.closest("[data-flash]").remove();
 
@@ -84,17 +87,19 @@ function formatRupees(value) {
 
 function updatePackageForm(form, fillFee) {
   const pkg = form.querySelector("input[name=package_id]:checked");
-  // register form has a start date input; renew form gets its start from the server
-  const startText = form.querySelector("[name=start_date]")?.value ?? form.dataset.start;
+  // register and renew forms both have a start date input
+  const startText = form.querySelector("[name=start_date]")?.value;
   const fee = form.querySelector("[data-fee-input]");
   if (pkg && fillFee && fee) fee.value = pkg.dataset.price;
   form.querySelectorAll("[data-package-name]").forEach((el) => (el.textContent = pkg ? pkg.dataset.name : ""));
   form.querySelectorAll("[data-fee-display]").forEach((el) => (el.textContent = formatRupees(fee?.value)));
-  let end = "";
-  if (pkg && /^\d{4}-\d{2}-\d{2}$/.test(startText || "")) {
+  let start = "", end = "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(startText || "")) {
     const [y, m, d] = startText.split("-").map(Number);
-    end = formatDate(packageEndDate(new Date(y, m - 1, d), Number(pkg.dataset.months)));
+    start = formatDate(new Date(y, m - 1, d));
+    if (pkg) end = formatDate(packageEndDate(new Date(y, m - 1, d), Number(pkg.dataset.months)));
   }
+  form.querySelectorAll("[data-start-date]").forEach((el) => (el.textContent = start || "—"));
   form.querySelectorAll("[data-end-date]").forEach((el) => (el.textContent = end || "—"));
 }
 
@@ -169,6 +174,29 @@ document.addEventListener("submit", (e) => {
   });
 });
 
+// ---------- phones: #page scrolls instead of the window (see base.html) ----------
+
+const pageArea = () => document.getElementById("page");
+
+// Members list: a new page / filter starts at the top (desktop uses htmx show:window:top)
+document.addEventListener("htmx:afterSwap", (e) => {
+  if (e.detail.target.id === "members-list") pageArea()?.scrollTo(0, 0);
+});
+
+// Back button: return to the same place in the list
+window.addEventListener("pagehide", () => {
+  try { sessionStorage.setItem("scroll:" + location.href, String(pageArea()?.scrollTop || 0)); } catch {}
+});
+
+function restorePageScroll() {
+  const nav = performance.getEntriesByType("navigation")[0];
+  if (!nav || nav.type !== "back_forward") return;
+  try {
+    const y = Number(sessionStorage.getItem("scroll:" + location.href));
+    if (y) pageArea()?.scrollTo(0, y);
+  } catch {}
+}
+
 // Back/forward cache: re-enable buttons when the page is shown again
 window.addEventListener("pageshow", (e) => {
   if (e.persisted && document.querySelector("form[data-sending]")) location.reload();
@@ -180,6 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (flash) setTimeout(() => flash.remove(), 4000);
 
   document.querySelectorAll("[data-package-form]").forEach((form) => updatePackageForm(form, false));
+  restorePageScroll();
 
   // e.g. renew sheet re-opened with errors, or opened from "Mark paid"
   document.querySelector("dialog[data-autoopen]")?.showModal();

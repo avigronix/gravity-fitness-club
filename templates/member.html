@@ -143,7 +143,10 @@
         <p class="font-semibold">{{ pay.package }} <span class="text-muted font-normal">· {{ pay.mode }}</span></p>
         <p class="text-xs text-muted">{{ pay.period_start | dmy }} – {{ pay.period_end | dmy }} · paid {{ pay.paid_on | dmy }}</p>
       </div>
-      <p class="font-bold whitespace-nowrap">{{ pay.amount | inr }}</p>
+      <div class="text-right">
+        <p class="font-bold whitespace-nowrap">{{ pay.amount | inr }}</p>
+        <a href="/payments/{{ pay.id }}/receipt" class="text-xs font-semibold text-brand underline">Receipt</a>
+      </div>
     </li>
     {% else %}
     <li class="py-3 text-sm text-muted">No payments yet.</li>
@@ -156,7 +159,7 @@
         class="m-0 mt-auto w-full max-w-full max-h-[92dvh] overflow-y-auto rounded-t-3xl bg-white p-0
                md:m-auto md:max-w-lg md:rounded-3xl">
   <form method="post" action="/members/{{ m.id }}/renew" novalidate class="p-5 md:p-6 pb-[calc(env(safe-area-inset-bottom)+20px)]"
-        data-package-form data-renew-form data-submit-once data-start="{{ renew_start.isoformat() }}">
+        data-package-form data-renew-form data-submit-once>
     <div class="mx-auto mb-4 h-1.5 w-10 rounded-full bg-zinc-300 md:hidden"></div>
     <div class="flex items-start justify-between gap-4">
       <div>
@@ -180,10 +183,12 @@
       {{ select("mode", "Payment mode", pay_modes, rv, renew_errors) }}
     </div>
 
+    {{ field("start_date", "Start date", rv, renew_errors, type="date", required=True, cls="mt-4") }}
+
     <div class="mt-4 rounded-xl bg-zinc-100 px-4 py-3 text-sm">
       <p class="text-muted">New period</p>
       <p class="font-bold"><span data-start-date>{{ renew_start | dmy }}</span> – <span data-end-date>—</span></p>
-      <p class="mt-1 text-muted">Starts {{ "today (old package already ended)" if renew_start == today else "the day after the current package ends" }}.</p>
+      <p class="mt-1 text-muted">Suggested start: {{ renew_start | dmy }} ({{ "today – old package already ended" if renew_start == today else "day after the current package ends" }}).</p>
     </div>
 
     <div class="mt-5 grid grid-cols-[auto_1fr] gap-3">

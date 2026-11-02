@@ -89,10 +89,12 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates", context_processors
 templates.env.filters.update(
     inr=utils.inr, inr_short=utils.inr_short, dmy=utils.fmt_date, short=utils.fmt_short,
     long=utils.fmt_long, days_label=utils.days_label, mask_aadhaar=utils.mask_aadhaar,
+    in_words=utils.rupees_in_words,
     days_left=lambda d: (d - utils.today()).days,
 )
 templates.env.globals.update(
-    gym_name=utils.GYM_NAME, reminder_days=utils.REMINDER_DAYS, recent_days=utils.RECENT_EXPIRED_DAYS,
+    gym_name=utils.GYM_NAME, gym_address=utils.GYM_ADDRESS, gym_phone=utils.GYM_PHONE,
+    reminder_days=utils.REMINDER_DAYS, recent_days=utils.RECENT_EXPIRED_DAYS,
     status_labels=utils.STATUS_LABELS,
     initials=utils.initials, full_name=utils.full_name, member_wa_link=utils.member_whatsapp_link,
     sent_label=utils.sent_label, food_types=FOOD_TYPES, objectives=OBJECTIVES, pay_modes=PAY_MODES,
@@ -379,10 +381,10 @@ def create_member(v: dict, package: dict, photo: bytes | None, ext: str | None) 
     }
     with db.connection() as conn:
         member = conn.execute(INSERT_MEMBER, params).fetchone()
-        conn.execute(INSERT_PAYMENT, params | {"member_id": member["id"]})
+        payment = conn.execute(INSERT_PAYMENT + " RETURNING id", params | {"member_id": member["id"]}).fetchone()
         if photo:
             save_photo(conn, member["id"], photo, ext)
-    return member
+    return member | {"payment_id": payment["id"]}
 
 
 # ---------- members: register ----------
@@ -425,7 +427,7 @@ def register(request: Request, form=Depends(form_data)):
         return register_page(request, v, errors, status_code=400)
     member = create_member(v, find_package(packages, v["package_id"]), photo, ext)
     flash(request, f"Member saved – {member['membership_no']}")
-    return redirect(f"/members/{member['id']}")
+    return redirect(f"/payments/{member['payment_id']}/receipt")
 
 
 @router.get("/members/check-mobile")
@@ -541,7 +543,8 @@ def member_form_values(member: dict) -> dict:
 
 
 def renew_defaults(member: dict) -> dict:
-    return {"package_id": str(member["package_id"]), "fee": str(member["renewal_fee"]), "mode": "Cash"}
+    return {"package_id": str(member["package_id"]), "fee": str(member["renewal_fee"]), "mode": "Cash",
+            "start_date": utils.renewal_start(member["end_date"]).isoformat()}
 
 
 def safe_return_url(url: str) -> str:
@@ -625,8 +628,9 @@ def renew_member(member_id: int, v: dict, package: dict) -> tuple[date, date] | 
         row = conn.execute("SELECT end_date FROM members WHERE id = %s FOR UPDATE", (member_id,)).fetchone()
         if row["end_date"].isoformat() != v["current_end"]:
             return None
-        start = utils.renewal_start(row["end_date"])
-        params = {"member_id": member_id, "package_id": package["id"], "fee": int(v["fee"]),
+        # start date picked in the renew sheet; default = day after the old end (or today)
+        start = to_date(v["start_date"]) or utils.renewal_start(row["end_date"])
+        params ={"member_id": member_id, "package_id": package["id"], "fee": int(v["fee"]),
                   "mode": v["mode"], "start_date": start, "end_date": utils.end_date(start, package["months"])}
         conn.execute(INSERT_PAYMENT, params)
         conn.execute("""UPDATE members SET package_id = %(package_id)s, start_date = %(start_date)s,
@@ -641,7 +645,7 @@ def renew(request: Request, member_id: int, form=Depends(form_data)):
     if not member:
         return redirect("/members")
     packages = get_packages()
-    v, errors = clean_payment(form, packages, with_start=False)
+    v, errors = clean_payment(form, packages, with_start="start_date" in form)
     v["current_end"] = str(form.get("current_end") or "")
     return_to = safe_return_url(str(form.get("return_to") or ""))
     if errors:
@@ -655,6 +659,34 @@ def renew(request: Request, member_id: int, form=Depends(form_data)):
     else:
         flash(request, "Already renewed – no second payment was saved.", "error")
     return redirect(return_to or f"/members/{member_id}")
+
+
+# ---------- payment receipt ----------
+
+def get_receipt(payment_id: int) -> dict | None:
+    return db.fetch_one(
+        """SELECT pay.id, pay.member_id, pay.amount, pay.mode, pay.period_start, pay.period_end, pay.paid_on,
+                  p.name AS package, m.membership_no, m.first_name, m.last_name, m.guardian_name,
+                  m.mobile, m.address,
+                  pay.id = (SELECT min(id) FROM payments WHERE member_id = pay.member_id) AS is_joining
+           FROM payments pay
+           JOIN members m ON m.id = pay.member_id
+           JOIN packages p ON p.id = pay.package_id
+           WHERE pay.id = %s""",
+        (payment_id,),
+    )
+
+
+@router.get("/payments/{payment_id:int}/receipt")
+def receipt(request: Request, payment_id: int):
+    """Invoice-style receipt. Receptionist: only the joining receipt (the payment they took)."""
+    r = get_receipt(payment_id)
+    if not r:
+        raise HTTPException(status_code=404)
+    if request.state.role != "admin" and not r["is_joining"]:
+        raise HTTPException(status_code=403)
+    return render(request, "receipt.html", nav="members", r=r, receipt_no=f"R-{r['id']:05d}",
+                  member_name=utils.full_name(r["first_name"], r["last_name"]))
 
 
 # ---------- payment reminders ----------

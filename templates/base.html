@@ -64,6 +64,11 @@
 </head>
 <body class="min-h-screen">
   {% block layout %}
+  {# Phones: only #page scrolls, never the document – so the bottom tab bar and save bars stay put
+     on iPhone Safari (toolbar collapse / rubber-band) and every other phone browser. #}
+  <style>
+    @media (max-width: 767px) { html, body { height: 100%; overflow: hidden; } }
+  </style>
 
   {# ---------- desktop sidebar ---------- #}
   {% set menu = [
@@ -103,7 +108,8 @@
     </div>
   </aside>
 
-  <div class="md:pl-60 min-h-screen">
+  {# relative: absolutely placed bits (e.g. the hidden photo input) stay inside the scroll area #}
+  <div id="page" class="md:pl-60 md:min-h-screen max-md:relative max-md:h-full max-md:overflow-y-auto max-md:overflow-x-hidden">
     {# ---------- mobile header (pages can replace it) ---------- #}
     {% block mobile_header %}
     <header class="md:hidden bg-ink text-white px-4 pt-[calc(env(safe-area-inset-top)+14px)] pb-5">

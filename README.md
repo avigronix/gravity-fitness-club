@@ -146,6 +146,7 @@ The receptionist can also change their own password after login (More → Change
 - [ ] **Change the admin password** – sidebar → *Change password* (phone: *More* → *Change password*).
 - [ ] **`.env`** – a long random `SECRET_KEY` (the app warns on startup if it is still `change-me`),
       and `COOKIE_SECURE=true` once the site runs on https.
+      `GYM_ADDRESS` and `GYM_PHONE` are printed on receipts (leave empty to hide).
 - [ ] **Daily backup** (keep ~30 days), e.g. cron on the server:
       `0 2 * * * pg_dump -d gym_admin -F c -f /backups/gym_$(date +\%F).dump`
       (Windows: Task Scheduler with `pg_dump -U postgres -d gym_admin -F c -f D:\backups\gym.dump`).
@@ -158,7 +159,7 @@ The receptionist can also change their own password after login (More → Change
 main.py              FastAPI app + all routes
 db.py                connection pool (Asia/Kolkata on every connection) + query helpers
 utils.py             passwords, login limit, dates, end-date rule, money, WhatsApp messages
-templates/           base, login, dashboard, register, members, member, reminders, password, staff, error
+templates/           base, login, dashboard, register, members, member, reminders, password, staff, receipt, error
 templates/partials/  members_list, reminder_list (HTMX swaps), member_form, mobile_check, ui (icons/macros)
 static/app.js        end-date preview, renew confirm, reminder "sent" logging, sheets
 static/uploads/      member photos (<member id>.jpg/png/webp, under 2 MB – big phone photos are shrunk in the browser)
