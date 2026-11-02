@@ -1,0 +1,125 @@
+{# Member form sections shared by register.html and the edit form in member.html. #}
+{% from "partials/ui.html" import icon, field, field_error, select, segmented %}
+
+{% macro dup_warning(duplicates) -%}
+{% if duplicates %}
+<div class="mt-2 rounded-xl bg-[#FEF3C7] text-[#92400E] px-3 py-2 text-xs leading-relaxed">
+  <b>Number already used by</b>
+  {% for d in duplicates %}
+  <a href="/members/{{ d.id }}" target="_blank" class="underline font-semibold">{{ full_name(d.first_name, d.last_name) }} ({{ d.membership_no }})</a>{{ "," if not loop.last }}
+  {% endfor %}
+  — you can still save (family members can share a number).
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro personal_card(v, errors, duplicates, photo_url="", exclude_id=0) -%}
+<section class="card p-4 md:p-6">
+  <div class="md:grid md:grid-cols-[150px_1fr] md:gap-6">
+    <div class="mb-5 md:mb-0">
+      <label class="flex md:flex-col items-center gap-4 md:gap-3 cursor-pointer">
+        <span class="relative w-20 h-20 md:w-[150px] md:h-[150px] shrink-0 grid place-items-center overflow-hidden rounded-full md:rounded-2xl border-2 border-dashed bg-zinc-50 text-zinc-500 {{ 'border-brand' if errors.photo else 'border-zinc-300' }}">
+          <img data-photo-preview alt="" src="{{ photo_url }}" class="{{ '' if photo_url else 'hidden' }} absolute inset-0 w-full h-full object-cover">
+          <span class="flex flex-col items-center gap-1 text-xs">{{ icon("camera", "w-7 h-7") }}<span class="hidden md:block">Member photo</span></span>
+        </span>
+        <span class="md:text-center">
+          <span class="block font-semibold md:hidden">Member photo</span>
+          <span class="block text-sm text-muted md:hidden">Tap to {{ "change" if photo_url else "take" }} photo or upload</span>
+          <span class="hidden md:inline-flex btn-outline !min-h-[38px] text-xs">{{ "Change photo" if photo_url else "Upload / Camera" }}</span>
+        </span>
+        <input type="file" name="photo" accept="image/*" capture="user" class="sr-only" data-photo-input>
+      </label>
+      <p class="mt-2 text-xs text-muted md:text-center">Optional · JPG, PNG, WEBP · max 5 MB</p>
+      {{ field_error(errors, "photo") }}
+    </div>
+
+    <div>
+      <h2 class="section-title mb-4">Personal information</h2>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4">
+        {{ field("first_name", "First name", v, errors, "e.g. Vishal", required=True, attrs='autocomplete="off"', cls="col-span-2 md:col-span-1") }}
+        {{ field("last_name", "Last name", v, errors, "e.g. Ojha", attrs='autocomplete="off"', cls="col-span-2 md:col-span-1") }}
+        {{ field("guardian_name", "Son / Daughter / Wife of", v, errors, "Father / husband name", cls="col-span-2 md:col-span-1") }}
+
+        <div class="col-span-2 md:col-span-1">
+          <label for="f-mobile" class="label">WhatsApp / Mobile <span class="text-brand">*</span></label>
+          <div class="flex rounded-xl border bg-white overflow-hidden focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 {{ 'border-brand ring-2 ring-brand/15' if errors.mobile else 'border-zinc-300' }}">
+            <span class="grid place-items-center px-3 bg-zinc-100 text-zinc-600 font-semibold border-r border-zinc-300">+91</span>
+            <input id="f-mobile" name="mobile" value="{{ v.mobile }}" type="tel" inputmode="numeric" maxlength="12"
+                   placeholder="10-digit number" autocomplete="off" required
+                   class="flex-1 min-w-0 h-[48px] md:h-[44px] px-3 text-base md:text-sm outline-none"
+                   {% if errors.mobile %}aria-invalid="true" aria-describedby="err-mobile"{% endif %}
+                   hx-get="/members/check-mobile" hx-trigger="input changed delay:400ms" hx-target="#mobile-check"
+                   hx-vals='{"exclude": {{ exclude_id }}}'>
+          </div>
+          {{ field_error(errors, "mobile") }}
+          <div id="mobile-check" aria-live="polite">{{ dup_warning(duplicates) }}</div>
+        </div>
+
+        <div>
+          <span class="label">Sex <span class="text-brand">*</span></span>
+          {{ segmented("sex", [("M", "Male"), ("F", "Female")], v) }}
+          {{ field_error(errors, "sex") }}
+        </div>
+        {{ field("age", "Age", v, errors, "21", type="number", attrs='inputmode="numeric" min="5" max="100"') }}
+
+        {{ field("email", "Email (optional)", v, errors, "name@example.com", type="email", attrs='autocomplete="off" autocapitalize="none"', cls="col-span-2 md:col-span-1") }}
+        {{ field("aadhaar_no", "Aadhaar No. (optional)", v, errors, "XXXX XXXX XXXX", attrs='inputmode="numeric" maxlength="14"', cls="col-span-2 md:col-span-1") }}
+        {{ field("address", "Address", v, errors, "Village / Mohalla, Kasia", cls="col-span-2 md:col-span-3") }}
+      </div>
+    </div>
+  </div>
+</section>
+{%- endmacro %}
+
+{% macro body_card(v, errors) -%}
+<section class="card p-4 md:p-6">
+  <h2 class="section-title mb-4">Body &amp; goal</h2>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    {{ field("weight_kg", "Weight (kg)", v, errors, "70", attrs='inputmode="decimal"') }}
+    {{ field("height", "Height (ft.in)", v, errors, "5.11", attrs='autocomplete="off"') }}
+    {{ select("food_type", "Food type", food_types, v, errors, blank="Select", cls="col-span-2 md:col-span-2") }}
+    <div class="col-span-2 md:col-span-4">
+      <span class="label">Objective</span>
+      {{ segmented("objective", objectives, v, chips=True) }}
+      {{ field_error(errors, "objective") }}
+    </div>
+  </div>
+</section>
+{%- endmacro %}
+
+{% macro medical_card(v, errors) -%}
+<section class="card p-4 md:p-6">
+  <h2 class="section-title mb-4">Medical information</h2>
+  <div class="grid md:grid-cols-3 gap-4">
+    <div class="flex md:block items-center justify-between gap-4">
+      <span class="label !mb-0 md:!mb-1.5">Sugar</span>
+      <div class="w-40 md:w-auto">{{ segmented("sugar", [("No", "No"), ("Yes", "Yes")], v) }}</div>
+    </div>
+    <div class="flex md:block items-center justify-between gap-4">
+      <span class="label !mb-0 md:!mb-1.5">Blood pressure</span>
+      <div class="w-52 md:w-auto">{{ segmented("blood_pressure", [("No", "No"), ("High", "High"), ("Low", "Low")], v) }}</div>
+    </div>
+    {{ field("disease", "Any disease / injury", v, errors, "None") }}
+  </div>
+  {{ caller() if caller }}
+</section>
+{%- endmacro %}
+
+{# Package radio cards. data-* feed the end-date / fee preview in app.js #}
+{% macro package_cards(packages, v, errors, cols="md:grid-cols-4") -%}
+<div class="grid grid-cols-2 {{ cols }} gap-3">
+  {% for p in packages %}
+  <label class="cursor-pointer">
+    <input type="radio" name="package_id" value="{{ p.id }}" class="peer sr-only"
+           data-months="{{ p.months }}" data-price="{{ p.price }}" data-name="{{ p.name }}"
+           {% if v.package_id == p.id | string %}checked{% endif %}>
+    <span class="block h-full rounded-2xl border-2 border-zinc-200 bg-white px-4 py-3 md:text-center transition select-none
+                 peer-checked:border-brand peer-checked:bg-brand/5 peer-focus-visible:ring-2 peer-focus-visible:ring-brand/30">
+      <span class="block font-bold">{{ p.name }}</span>
+      <span class="block text-sm text-muted">{{ p.price | inr }}</span>
+    </span>
+  </label>
+  {% endfor %}
+</div>
+{{ field_error(errors, "package_id") }}
+{%- endmacro %}

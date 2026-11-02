@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon %}
+{% block title %}Dashboard{% endblock %}
+
+{% block mobile_header_extra %}
+<p class="mt-5 mb-14 text-2xl font-bold">{{ greeting }}, {{ admin_name }}</p>
+{% endblock %}
+
+{% block content %}
+<div class="hidden md:flex items-end justify-between gap-4 mb-6">
+  <div>
+    <p class="text-sm text-muted">{{ greeting }}, {{ admin_name }} · {{ today | long }}</p>
+    <h1 class="page-title">Dashboard</h1>
+  </div>
+  <a href="/members/new" class="btn-primary px-5">{{ icon("plus") }} New Member</a>
+</div>
+
+{# ---------- mobile: big red "fee due" card over the black header ---------- #}
+<a href="/reminders" class="md:hidden relative -mt-[4.5rem] mb-4 block rounded-3xl bg-brand text-white p-5 shadow-xl shadow-brand/30 active:scale-[.99] transition">
+  <span class="absolute right-5 top-5 opacity-80">{{ icon("calendar", "w-8 h-8") }}</span>
+  <span class="block text-xs font-semibold uppercase tracking-wide opacity-90">Fee due in next {{ reminder_days }} days</span>
+  <span class="block font-head font-semibold text-5xl leading-tight">{{ s.due }} member{{ "" if s.due == 1 else "s" }}</span>
+  <span class="mt-3 flex items-center justify-center gap-2 min-h-[48px] rounded-xl bg-white text-brand font-bold">Send reminders {{ icon("arrow", "w-4 h-4") }}</span>
+</a>
+
+{# ---------- stat cards: 2x2 on mobile, 4 in a row on desktop ---------- #}
+<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
+  <a href="/members?status=active" class="card p-4 md:p-5 hover:ring-2 hover:ring-zinc-200 transition">
+    <p class="text-xs md:text-sm font-semibold text-muted md:uppercase md:tracking-wide">Active members</p>
+    <p class="font-head font-semibold text-4xl md:text-5xl leading-tight mt-1">{{ s.active }}</p>
+    <p class="text-xs md:text-sm font-semibold text-[#166534]">+{{ s.joined }} joined this month</p>
+  </a>
+
+  <a href="/reminders" class="hidden md:block card p-5 ring-2 ring-brand hover:bg-brand/5 transition">
+    <p class="text-sm font-semibold text-muted uppercase tracking-wide">Fee due in {{ reminder_days }} days</p>
+    <p class="font-head font-semibold text-5xl leading-tight mt-1 text-brand">{{ s.due }}</p>
+    <p class="text-sm font-semibold text-brand underline">Send reminders →</p>
+  </a>
+
+  <a href="/reminders?tab=expired" class="order-3 md:order-none card p-4 md:p-5 hover:ring-2 hover:ring-zinc-200 transition">
+    <p class="text-xs md:text-sm font-semibold text-muted md:uppercase md:tracking-wide">Expired / unpaid</p>
+    <p class="font-head font-semibold text-4xl md:text-5xl leading-tight mt-1 text-[#991B1B] md:text-zinc-900">{{ s.expired }}</p>
+    <p class="text-xs md:text-sm text-muted">Last {{ recent_days }} days · {{ s.expired_all }} in total</p>
+  </a>
+
+  <div class="order-2 md:order-none card p-4 md:p-5">
+    <p class="text-xs md:text-sm font-semibold text-muted md:uppercase md:tracking-wide">Collected ({{ today.strftime("%b") }})</p>
+    <p class="font-head font-semibold text-4xl md:text-5xl leading-tight mt-1">
+      <span class="md:hidden">{{ s.collected | inr_short }}</span><span class="hidden md:inline">{{ s.collected | inr }}</span>
+    </p>
+    <p class="text-xs md:text-sm text-muted">From {{ s.payments }} payment{{ "" if s.payments == 1 else "s" }}</p>
+  </div>
+
+  <a href="/members/new" class="order-4 md:hidden card bg-ink text-white p-4 flex flex-col justify-between min-h-[120px] active:scale-[.98] transition">
+    <span class="w-10 h-10 grid place-items-center rounded-xl bg-brand">{{ icon("plus") }}</span>
+    <span class="font-bold text-lg">New member</span>
+  </a>
+</div>
+
+<div class="mt-4 md:mt-6 grid lg:grid-cols-[1.4fr_1fr] gap-4 md:gap-6 items-start">
+  {# ---------- fee due soon ---------- #}
+  <section class="card p-4 md:p-6">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="section-title">Fee due soon</h2>
+      <a href="/reminders" class="text-sm font-semibold text-brand underline">View all</a>
+    </div>
+    {% if due %}
+    <ul class="divide-y divide-zinc-100">
+      {% for r in due %}
+      {% set left = r.end_date | days_left %}
+      <li class="py-3 flex items-center gap-3">
+        <a href="/members/{{ r.id }}" class="avatar w-10 h-10 text-sm">{{ initials(r.first_name, r.last_name) }}</a>
+        <a href="/members/{{ r.id }}" class="flex-1 min-w-0">
+          <span class="block font-semibold truncate">{{ full_name(r.first_name, r.last_name) }}</span>
+          <span class="block text-xs text-muted truncate">{{ r.package }} · {{ r.renewal_fee | inr }}
+            <span class="sm:hidden font-semibold {{ 'text-[#92400E]' if left > 1 else 'text-brand' }}">· {{ r.end_date | days_label }}</span></span>
+        </a>
+        <span class="hidden sm:inline-flex badge {{ 'badge-due' if left > 1 else 'badge-expired' }}">{{ r.end_date | days_label }}</span>
+        <a href="{{ r.link }}" target="_blank" rel="noopener" data-sent-url="/reminders/{{ r.id }}/sent" data-sent-for="{{ r.id }}"
+           class="{{ 'btn-sent' if r.last_reminder_at else 'btn-wa' }} btn-icon sm:w-auto sm:px-4" aria-label="WhatsApp {{ r.first_name }}">
+          {{ icon("whatsapp", "w-4 h-4") }}<span data-sent-text class="hidden sm:inline">{{ "Sent · Resend" if r.last_reminder_at else "WhatsApp" }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="py-6 text-center">
+      <div class="mx-auto w-12 h-12 rounded-full bg-[#DCFCE7] text-[#166534] grid place-items-center">{{ icon("check", "w-6 h-6") }}</div>
+      <p class="mt-3 font-semibold">All clear – no pending reminders</p>
+    </div>
+    {% endif %}
+  </section>
+
+  {# ---------- recent joins ---------- #}
+  <section class="card p-4 md:p-6">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="section-title">Recent joins</h2>
+      <a href="/members" class="text-sm font-semibold text-brand underline">All members</a>
+    </div>
+    <ul class="divide-y divide-zinc-100">
+      {% for m in recent %}
+      <li>
+        <a href="/members/{{ m.id }}" class="py-3 flex items-center justify-between gap-3 hover:text-brand">
+          <span class="min-w-0">
+            <span class="block font-semibold truncate">{{ full_name(m.first_name, m.last_name) }}</span>
+            <span class="block text-xs text-muted">{{ m.membership_no }} · {{ m.package }}</span>
+          </span>
+          <span class="text-sm text-muted whitespace-nowrap">{{ m.created_at.date() | short }}</span>
+        </a>
+      </li>
+      {% else %}
+      <li class="py-6 text-center text-sm text-muted">No members yet. <a href="/members/new" class="text-brand font-semibold underline">Register the first one</a></li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+{% endblock %}

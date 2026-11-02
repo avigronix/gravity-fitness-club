@@ -1,0 +1,107 @@
+{# Small reusable UI pieces. Import with: {% from "partials/ui.html" import icon %} #}
+
+{% macro icon(name, cls="w-5 h-5") -%}
+{%- set paths = {
+  "dashboard": '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+  "home": '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  "user-plus": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/>',
+  "users": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  "list": '<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>',
+  "bell": '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  "logout": '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+  "plus": '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  "more": '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  "whatsapp": '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  "phone": '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  "search": '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  "eye": '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  "renew": '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  "camera": '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+  "calendar": '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  "back": '<path d="m15 18-6-6 6-6"/>',
+  "next": '<path d="m9 18 6-6-6-6"/>',
+  "arrow": '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  "check": '<path d="M20 6 9 17l-5-5"/>',
+  "check-circle": '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
+  "alert": '<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  "x": '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  "pencil": '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+  "lock": '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+} -%}
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="{{ cls }} shrink-0" aria-hidden="true">{{ paths[name] | safe }}</svg>
+{%- endmacro %}
+
+{# Black mobile header for inner pages: title, optional subtitle / right text / back link. #}
+{% macro mobile_bar(title, sub="", back="", right="") -%}
+<div class="flex items-center gap-3">
+  {% if back %}
+  <a href="{{ back }}" class="-ml-2 w-10 h-10 grid place-items-center rounded-xl active:bg-white/10" aria-label="Back">{{ icon("back", "w-6 h-6") }}</a>
+  {% endif %}
+  <div class="min-w-0 flex-1">
+    <h1 class="font-head font-semibold uppercase text-2xl leading-tight tracking-wide truncate">{{ title }}</h1>
+    {% if sub %}<p class="text-xs text-zinc-400 truncate">{{ sub }}</p>{% endif %}
+  </div>
+  {% if right %}<span class="text-sm text-zinc-400 whitespace-nowrap">{{ right }}</span>{% endif %}
+</div>
+{%- endmacro %}
+
+{# ---------- form pieces (v = form values dict, errors = {field: message}) ---------- #}
+
+{% macro field_error(errors, name) -%}
+{% if errors[name] %}<p class="field-error" id="err-{{ name }}">{{ errors[name] }}</p>{% endif %}
+{%- endmacro %}
+
+{% macro field(name, label, v, errors, placeholder="", type="text", attrs="", required=False, cls="") -%}
+<div class="{{ cls }}">
+  <label for="f-{{ name }}" class="label">{{ label }}{% if required %} <span class="text-brand">*</span>{% endif %}</label>
+  <input id="f-{{ name }}" name="{{ name }}" type="{{ type }}" value="{{ v.get(name, '') }}" placeholder="{{ placeholder }}"
+         class="input {{ 'input-error' if errors[name] }}" {{ attrs | safe }}
+         {% if required %}required{% endif %} {% if errors[name] %}aria-invalid="true" aria-describedby="err-{{ name }}"{% endif %}>
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{% macro select(name, label, options, v, errors, blank="", cls="") -%}
+<div class="{{ cls }}">
+  <label for="f-{{ name }}" class="label">{{ label }}</label>
+  <select id="f-{{ name }}" name="{{ name }}" class="input {{ 'input-error' if errors[name] }}">
+    {% if blank %}<option value="">{{ blank }}</option>{% endif %}
+    {% for o in options %}<option {% if v.get(name) == o %}selected{% endif %}>{{ o }}</option>{% endfor %}
+  </select>
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{# Segmented buttons / chips built from radio inputs. options = ["Text", ...] or [(value, text), ...] #}
+{% macro segmented(name, options, v, chips=False) -%}
+<div class="{{ 'flex flex-wrap gap-2' if chips else 'grid grid-flow-col auto-cols-fr gap-1 p-1 rounded-xl bg-zinc-100' }}">
+  {% for option in options %}
+  {% set value, text = (option, option) if option is string else option %}
+  <label class="cursor-pointer">
+    <input type="radio" name="{{ name }}" value="{{ value }}" class="peer sr-only" {% if v.get(name) == value %}checked{% endif %}>
+    <span class="{{ 'flex items-center min-h-[44px] px-4 rounded-full border border-zinc-300 bg-white' if chips else 'grid place-items-center min-h-[44px] rounded-lg text-zinc-600' }}
+                 text-sm font-semibold transition select-none peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40
+                 peer-checked:bg-ink peer-checked:text-white peer-checked:border-ink {{ '' if chips else 'peer-checked:shadow' }}">{{ text }}</span>
+  </label>
+  {% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro info_row(label, value) -%}
+<div class="flex justify-between gap-4 py-2.5 border-b border-zinc-100 last:border-0">
+  <dt class="text-sm text-muted">{{ label }}</dt>
+  <dd class="text-sm font-semibold text-right break-words min-w-0">{{ value if value not in (none, "") else "—" }}</dd>
+</div>
+{%- endmacro %}
+
+{% macro status_badge(status) -%}
+<span class="badge badge-{{ status }}">{{ status_labels[status] }}</span>
+{%- endmacro %}
+
+{% macro empty_state(title, text="") -%}
+<div class="card p-10 text-center">
+  <div class="mx-auto w-14 h-14 rounded-full bg-[#DCFCE7] text-[#166534] grid place-items-center">{{ icon("check", "w-7 h-7") }}</div>
+  <p class="mt-4 font-semibold">{{ title }}</p>
+  {% if text %}<p class="mt-1 text-sm text-muted">{{ text }}</p>{% endif %}
+</div>
+{%- endmacro %}

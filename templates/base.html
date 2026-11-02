@@ -1,0 +1,198 @@
+{% from "partials/ui.html" import icon %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0B0B0C">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Gravity Admin">
+  <meta name="format-detection" content="telephone=no">
+  {# back/forward always reloads the real page from the server (never a stale HTMX snapshot) #}
+  <meta name="htmx-config" content='{"historyCacheSize": 0, "refreshOnHistoryMiss": true}'>
+  <title>{% block title %}Admin{% endblock %} · {{ gym_name }}</title>
+  <link rel="icon" href="/static/logo.jpg">
+  <link rel="apple-touch-icon" href="/static/logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: { brand: { DEFAULT: '#D7141A', dark: '#A50F14' }, ink: '#0B0B0C', page: '#F4F4F5',
+                muted: '#52525B', wa: { DEFAULT: '#15803D', dark: '#166534' } },
+      fontFamily: { head: ['Oswald', 'sans-serif'], sans: ['Inter', 'system-ui', 'sans-serif'] }
+    }}}
+  </script>
+  <style type="text/tailwindcss">
+    @layer base {
+      html { -webkit-tap-highlight-color: transparent; }
+      body { @apply bg-page text-zinc-900 font-sans antialiased; }
+      input, select, textarea { font-size: 16px; }
+    }
+    @layer components {
+      .card { @apply bg-white rounded-2xl; }
+      .btn { @apply inline-flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-xl text-sm font-semibold whitespace-nowrap transition select-none active:scale-[.97] disabled:opacity-60; }
+      .btn-primary { @apply btn bg-brand text-white hover:bg-brand-dark; }
+      .btn-dark { @apply btn bg-ink text-white hover:bg-zinc-800; }
+      .btn-outline { @apply btn bg-white border border-zinc-300 text-zinc-900 hover:bg-zinc-50; }
+      .btn-wa { @apply btn bg-wa text-white hover:bg-wa-dark; }
+      .btn-sent { @apply btn bg-muted text-white hover:bg-zinc-700; }
+      .btn-icon { @apply btn px-0 w-11; }
+      .btn-save { @apply btn-primary font-head font-semibold uppercase tracking-wider text-base; }
+      .input { @apply w-full h-[50px] md:h-11 px-3.5 rounded-xl border border-zinc-300 bg-white text-base md:text-sm outline-none transition placeholder:text-zinc-400 focus:border-brand focus:ring-2 focus:ring-brand/20; }
+      .input-error { @apply border-brand ring-2 ring-brand/15; }
+      .label { @apply block text-sm font-semibold mb-1.5; }
+      .field-error { @apply mt-1 text-xs font-medium text-brand; }
+      .badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap; }
+      .badge-active { @apply bg-[#DCFCE7] text-[#166534]; }
+      .badge-due { @apply bg-[#FEF3C7] text-[#92400E]; }
+      .badge-expired { @apply bg-[#FEE2E2] text-[#991B1B]; }
+      .page-title { @apply font-head font-semibold uppercase text-4xl tracking-wide leading-tight; }
+      .section-title { @apply font-head font-semibold uppercase text-xl tracking-wide; }
+      .avatar { @apply grid place-items-center rounded-full bg-zinc-900 text-white font-bold shrink-0; }
+    }
+  </style>
+  <style>
+    @view-transition { navigation: auto; }
+    dialog::backdrop { background: rgb(0 0 0 / .5); }
+  </style>
+  <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body class="min-h-screen">
+  {% block layout %}
+
+  {# ---------- desktop sidebar ---------- #}
+  {% set menu = [
+    ("dashboard", "/", "Dashboard", "dashboard"),
+    ("register", "/members/new", "New Registration", "user-plus"),
+    ("members", "/members", "All Members", "list"),
+    ("reminders", "/reminders", "Payment Reminders", "bell"),
+  ] %}
+  <aside class="hidden md:flex fixed inset-y-0 left-0 z-30 w-60 bg-ink text-zinc-300 flex-col px-4 py-6">
+    <a href="/" class="block mx-auto mb-8">
+      <img src="/static/logo.jpg" alt="{{ gym_name }}" class="w-36 rounded-lg ring-1 ring-white/10">
+    </a>
+    <nav class="flex flex-col gap-1">
+      {% for key, href, label, ic in menu %}
+      <a href="{{ href }}"
+         class="flex items-center gap-3 min-h-[44px] px-3 rounded-xl text-[15px] font-medium transition
+                {{ 'bg-brand text-white' if nav == key else 'hover:bg-white/5 hover:text-white' }}"
+         {% if nav == key %}aria-current="page"{% endif %}>
+        {{ icon(ic, "w-[18px] h-[18px]") }}
+        <span class="flex-1">{{ label }}</span>
+        {% if key == "reminders" and reminder_count %}
+        <span class="min-w-[22px] h-[22px] px-1.5 grid place-items-center rounded-full text-xs font-bold
+                     {{ 'bg-white text-brand' if nav == key else 'bg-brand text-white' }}">{{ reminder_count }}</span>
+        {% endif %}
+      </a>
+      {% endfor %}
+      <a href="/logout" class="mt-6 flex items-center gap-3 min-h-[44px] px-3 rounded-xl text-[15px] font-medium hover:bg-white/5 hover:text-white">
+        {{ icon("logout", "w-[18px] h-[18px]") }} Logout
+      </a>
+    </nav>
+    <div class="mt-auto flex items-center gap-3 px-3 pt-4 border-t border-white/10">
+      <div class="avatar w-9 h-9 text-sm bg-white/10">{{ admin_name[:1] | upper }}</div>
+      <div class="min-w-0">
+        <p class="text-sm font-semibold text-white truncate">{{ admin_name }}</p>
+        <a href="/account/password" class="text-xs hover:text-white {{ 'text-white' if nav == 'account' else 'text-zinc-500' }}">Change password</a>
+      </div>
+    </div>
+  </aside>
+
+  <div class="md:pl-60 min-h-screen">
+    {# ---------- mobile header (pages can replace it) ---------- #}
+    {% block mobile_header %}
+    <header class="md:hidden bg-ink text-white px-4 pt-[calc(env(safe-area-inset-top)+14px)] pb-5">
+      <div class="flex items-center gap-3">
+        <img src="/static/logo.jpg" alt="" class="w-11 h-11 rounded-lg object-cover">
+        <div class="flex-1 min-w-0">
+          <p class="font-head font-semibold uppercase text-xl leading-none tracking-wide">Gravity Fitness</p>
+          <p class="text-xs text-zinc-400 mt-1">{{ today.strftime("%a, %d %b %Y") }}</p>
+        </div>
+        <a href="/reminders" class="relative w-11 h-11 grid place-items-center rounded-xl bg-white/10 active:bg-white/20" aria-label="Payment reminders ({{ reminder_count }})">
+          {{ icon("bell", "w-5 h-5") }}
+          {% if reminder_count %}
+          <span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 grid place-items-center rounded-full bg-brand text-[11px] font-bold">{{ reminder_count }}</span>
+          {% endif %}
+        </a>
+      </div>
+      {% block mobile_header_extra %}{% endblock %}
+    </header>
+    {% endblock %}
+
+    <main class="px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+104px)] md:px-8 md:py-8 md:pb-10 max-w-[1320px]">
+      {% if flash %}
+      <div data-flash role="status"
+           class="fixed z-50 top-[calc(env(safe-area-inset-top)+10px)] inset-x-3 md:static md:mb-6
+                  flex items-start gap-3 rounded-2xl px-4 py-3 shadow-lg md:shadow-none text-sm font-medium
+                  {{ 'bg-[#DCFCE7] text-[#166534]' if flash.kind == 'success' else 'bg-[#FEE2E2] text-[#991B1B]' }}">
+        {{ icon("check-circle" if flash.kind == "success" else "alert", "w-5 h-5 mt-0.5") }}
+        <p class="flex-1">{{ flash.message }}</p>
+        <button type="button" data-close-flash class="-my-2.5 -mr-3 w-11 h-11 grid place-items-center rounded-lg" aria-label="Close message">{{ icon("x", "w-4 h-4") }}</button>
+      </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  {# ---------- mobile bottom tab bar (register page replaces it with a save bar) ---------- #}
+  {% block bottom_nav %}
+  {% set tabs_left = [("dashboard", "/", "Home", "home"), ("members", "/members", "Members", "users")] %}
+  <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-zinc-200 pb-[env(safe-area-inset-bottom)]" aria-label="Main">
+    <div class="grid grid-cols-5 h-16 items-end pb-2 text-[11px] font-semibold">
+      {% for key, href, label, ic in tabs_left %}
+      <a href="{{ href }}" class="flex flex-col items-center gap-1 {{ 'text-brand' if nav == key else 'text-zinc-500' }}" {% if nav == key %}aria-current="page"{% endif %}>
+        {{ icon(ic, "w-6 h-6") }}{{ label }}
+      </a>
+      {% endfor %}
+      <div class="flex justify-center">
+        <a href="/members/new" aria-label="New member"
+           class="-mt-8 w-[60px] h-[60px] grid place-items-center rounded-2xl bg-brand text-white shadow-lg shadow-brand/40 ring-4 ring-white active:scale-95 transition">
+          {{ icon("plus", "w-7 h-7") }}
+        </a>
+      </div>
+      <a href="/reminders" class="relative flex flex-col items-center gap-1 {{ 'text-brand' if nav == 'reminders' else 'text-zinc-500' }}" {% if nav == 'reminders' %}aria-current="page"{% endif %}>
+        {{ icon("bell", "w-6 h-6") }}Reminders
+        {% if reminder_count %}
+        <span class="absolute -top-1 left-1/2 ml-1.5 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full bg-brand text-white text-[10px] font-bold">{{ reminder_count }}</span>
+        {% endif %}
+      </a>
+      <button type="button" data-open="more-sheet" class="flex flex-col items-center gap-1 text-zinc-500">
+        {{ icon("more", "w-6 h-6") }}More
+      </button>
+    </div>
+  </nav>
+  {% endblock %}
+
+  {# ---------- mobile "More" bottom sheet ---------- #}
+  <dialog id="more-sheet" class="md:hidden m-0 mt-auto w-full max-w-full rounded-t-3xl bg-white p-0 pb-[env(safe-area-inset-bottom)]">
+    <div class="p-5">
+      <div class="mx-auto mb-4 h-1.5 w-10 rounded-full bg-zinc-300"></div>
+      <div class="flex items-center gap-3 pb-4 border-b border-zinc-100">
+        <div class="avatar w-11 h-11">{{ admin_name[:1] | upper }}</div>
+        <div>
+          <p class="font-semibold">{{ admin_name }}</p>
+          <p class="text-xs text-muted">{{ gym_name }}</p>
+        </div>
+      </div>
+      <nav class="py-2">
+        {% for key, href, label, ic in menu %}
+        <a href="{{ href }}" class="flex items-center gap-3 min-h-[52px] px-1 font-medium {{ 'text-brand' if nav == key else '' }}">
+          {{ icon(ic) }}<span class="flex-1">{{ label }}</span>{{ icon("next", "w-4 h-4 text-zinc-400") }}
+        </a>
+        {% endfor %}
+        <a href="/account/password" class="flex items-center gap-3 min-h-[52px] px-1 font-medium {{ 'text-brand' if nav == 'account' else '' }}">
+          {{ icon("lock") }}<span class="flex-1">Change password</span>{{ icon("next", "w-4 h-4 text-zinc-400") }}
+        </a>
+      </nav>
+      <a href="/logout" class="btn-outline w-full !min-h-[50px] text-brand border-brand/30">{{ icon("logout") }} Logout</a>
+    </div>
+  </dialog>
+
+  {% endblock %}
+</body>
+</html>

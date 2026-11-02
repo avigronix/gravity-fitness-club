@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon, mobile_bar, field, field_error, select %}
+{% from "partials/member_form.html" import personal_card, body_card, medical_card, package_cards %}
+{% block title %}New Registration{% endblock %}
+
+{% block mobile_header %}
+<header class="md:hidden bg-ink text-white px-4 pt-[calc(env(safe-area-inset-top)+12px)] pb-4">
+  {{ mobile_bar("New member", "Membership No. " ~ next_no, back="/") }}
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="hidden md:block mb-6">
+  <p class="text-sm text-muted">Membership No. <b class="text-zinc-900">{{ next_no }}</b> (auto)</p>
+  <h1 class="page-title">New Registration</h1>
+</div>
+
+{% if errors %}
+<div class="mb-4 flex items-start gap-2 rounded-2xl bg-[#FEE2E2] text-[#991B1B] px-4 py-3 text-sm font-medium" role="alert">
+  {{ icon("alert", "w-5 h-5 mt-0.5") }}
+  <p>Please fix the highlighted field{{ "s" if errors | length > 1 }} below.
+    {% if not errors.photo %}If you chose a photo, please choose it again.{% endif %}</p>
+</div>
+{% endif %}
+
+<form method="post" action="/members/new" enctype="multipart/form-data" novalidate
+      data-package-form data-submit-once class="space-y-4 md:space-y-5">
+
+  {{ personal_card(v, errors, duplicates) }}
+  {{ body_card(v, errors) }}
+
+  {# ---------- Package & Payment ---------- #}
+  <section class="card p-4 md:p-6 border-t-4 border-brand">
+    <h2 class="section-title mb-4">Package &amp; payment</h2>
+    <span class="label">Package <span class="text-brand">*</span></span>
+    {{ package_cards(packages, v, errors) }}
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5">
+      {{ field("start_date", "Start date", v, errors, type="date", required=True) }}
+      <div>
+        <span class="label">End date (auto)</span>
+        <div class="input bg-zinc-100 border-zinc-200 flex items-center font-bold" data-end-date>{{ end | dmy }}</div>
+      </div>
+      {{ field("fee", "Fee (₹)", v, errors, type="number", required=True, attrs='inputmode="numeric" min="0" data-fee-input') }}
+      {{ select("mode", "Payment mode", pay_modes, v, errors) }}
+    </div>
+
+    <p class="mt-4 flex items-start gap-2 rounded-xl bg-[#FEF3C7] text-[#92400E] px-3.5 py-3 text-sm">
+      {{ icon("bell", "w-4 h-4 mt-0.5") }}
+      <span>Fee reminder will show {{ reminder_days }} days before <b data-end-date>{{ end | dmy }}</b>.</span>
+    </p>
+  </section>
+
+  {% call medical_card(v, errors) %}
+  <label class="mt-5 flex items-start gap-3 cursor-pointer rounded-xl p-3 -mx-1 {{ 'bg-[#FEE2E2]' if errors.rules }}">
+    <input type="checkbox" name="rules" value="1" class="mt-0.5 w-5 h-5 shrink-0 accent-brand" {% if v.rules %}checked{% endif %}>
+    <span class="text-sm">Member agrees to gym rules — fee is non-refundable, proper dress code, no outside food or personal equipment. <span class="text-brand">*</span></span>
+  </label>
+  {{ field_error(errors, "rules") }}
+  {% endcall %}
+
+  {# desktop buttons #}
+  <div class="hidden md:flex justify-end gap-3">
+    <a href="/" class="btn-outline px-6">Cancel</a>
+    <button class="btn-save px-8">Save member</button>
+  </div>
+
+  {# mobile sticky save bar #}
+  <div class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-zinc-200 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)] flex items-center gap-3">
+    <div class="flex-1 min-w-0">
+      <p class="text-xs text-muted truncate"><span data-package-name>{{ package.name if package }}</span> · till <span data-end-date>{{ end | dmy }}</span></p>
+      <p class="font-head font-semibold text-2xl leading-tight" data-fee-display>{{ (v.fee | int) | inr }}</p>
+    </div>
+    <button class="btn-save px-6 !min-h-[52px]">Save member</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block bottom_nav %}{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{# No sidebar and no DB lookups here, so this page also works when the database is down. #}
+{% block layout %}
+<main class="min-h-screen grid place-items-center px-4 py-10">
+  <div class="card w-full max-w-sm p-8 text-center">
+    <img src="/static/logo.jpg" alt="{{ gym_name }}" class="mx-auto w-24 rounded-lg">
+    <p class="mt-6 font-head font-semibold text-6xl text-brand">{{ code }}</p>
+    <h1 class="mt-1 font-head font-semibold uppercase text-2xl tracking-wide">{{ title }}</h1>
+    <p class="mt-2 text-sm text-muted">
+      {% if code == 404 %}This page does not exist or was moved.{% else %}Please try again. If it keeps happening, restart the app and check the console.{% endif %}
+    </p>
+    <a href="/" class="btn-primary w-full mt-6 !min-h-[50px]">Go to dashboard</a>
+  </div>
+</main>
+{% endblock %}

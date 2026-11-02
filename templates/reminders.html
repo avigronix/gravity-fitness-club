@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import mobile_bar %}
+{% block title %}Payment Reminders{% endblock %}
+
+{% block mobile_header %}
+<header class="md:hidden bg-ink text-white px-4 pt-[calc(env(safe-area-inset-top)+14px)] pb-1">
+  {{ mobile_bar("Fee reminders", "Updates by itself every day") }}
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="hidden md:block mb-5">
+  <p class="text-sm text-muted">Members whose package ends within the next {{ reminder_days }} days show here automatically</p>
+  <h1 class="page-title">Payment Reminders</h1>
+</div>
+
+<div id="reminder-list">
+  {% include "partials/reminder_list.html" %}
+</div>
+{% endblock %}

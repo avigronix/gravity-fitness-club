@@ -1,0 +1,128 @@
+{# Swapped by HTMX on search / filter / page. Needs: rows, q, status, counts, total, page, pages, page_numbers, members_url #}
+{% from "partials/ui.html" import icon, status_badge %}
+
+{% macro list_link(url, cls, label="") -%}
+<a href="{{ url }}" hx-get="{{ url }}" hx-target="#members-list" hx-push-url="true" hx-swap="innerHTML show:window:top"
+   class="{{ cls }}" {% if label %}aria-label="{{ label }}"{% endif %}>{{ caller() }}</a>
+{%- endmacro %}
+
+<input type="hidden" id="status-input" name="status" value="{{ status }}">
+
+{# ---------- filter chips (counts follow the search) ---------- #}
+<div class="-mx-4 px-4 md:mx-0 md:px-0 overflow-x-auto [scrollbar-width:none]">
+  <div class="flex gap-2 w-max pb-1">
+    {% for key, label, count in [("", "All", counts.total), ("active", "Active", counts.active), ("due", "Due soon", counts.due), ("expired", "Expired", counts.expired)] %}
+    {% call list_link(members_url(q, key), "flex items-center min-h-[44px] px-4 rounded-full border text-sm font-semibold whitespace-nowrap transition " ~ ("bg-ink text-white border-ink" if status == key else "bg-white border-zinc-300 hover:bg-zinc-50")) %}
+      {{ label }} · {{ count }}
+    {% endcall %}
+    {% endfor %}
+  </div>
+</div>
+
+<p class="mt-3 mb-3 text-sm text-muted">
+  {{ total }} member{{ "" if total == 1 else "s" }} found{% if q %} for “<b class="text-zinc-900">{{ q }}</b>”{% endif %}
+</p>
+
+{% if rows %}
+{# ---------- desktop table ---------- #}
+<div class="hidden xl:block card overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="bg-ink text-white text-left">
+      <tr>
+        <th class="px-3 py-3 font-semibold">Member No.</th>
+        <th class="px-3 py-3 font-semibold">Name</th>
+        <th class="px-3 py-3 font-semibold">Mobile</th>
+        <th class="px-3 py-3 font-semibold">Package</th>
+        <th class="px-3 py-3 font-semibold">Start</th>
+        <th class="px-3 py-3 font-semibold">End</th>
+        <th class="px-3 py-3 font-semibold">Fee</th>
+        <th class="px-3 py-3 font-semibold">Status</th>
+        <th class="px-3 py-3 font-semibold">Action</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-zinc-100">
+      {% for m in rows %}
+      <tr class="hover:bg-zinc-50">
+        <td class="px-3 py-3 font-bold whitespace-nowrap">{{ m.membership_no }}</td>
+        <td class="px-3 py-3"><a href="/members/{{ m.id }}" class="font-medium hover:text-brand">{{ full_name(m.first_name, m.last_name) }}</a></td>
+        <td class="px-3 py-3 whitespace-nowrap">{{ m.mobile }}</td>
+        <td class="px-3 py-3 whitespace-nowrap">{{ m.package }}</td>
+        <td class="px-3 py-3 whitespace-nowrap">{{ m.start_date | dmy }}</td>
+        <td class="px-3 py-3 whitespace-nowrap">{{ m.end_date | dmy }}</td>
+        <td class="px-3 py-3 whitespace-nowrap">{{ m.fee | inr }}</td>
+        <td class="px-3 py-3">{{ status_badge(m.status) }}</td>
+        <td class="px-3 py-2">
+          <div class="flex gap-2">
+            <a href="/members/{{ m.id }}" class="btn-outline btn-icon" aria-label="View {{ full_name(m.first_name, m.last_name) }}">{{ icon("eye", "w-4 h-4") }}</a>
+            <a href="{{ member_wa_link(m) }}" target="_blank" rel="noopener" class="btn-wa btn-icon" aria-label="WhatsApp {{ full_name(m.first_name, m.last_name) }}">{{ icon("whatsapp", "w-4 h-4") }}</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# ---------- mobile cards ---------- #}
+<ul class="xl:hidden grid md:grid-cols-2 gap-3">
+  {% for m in rows %}
+  <li class="card p-4">
+    <a href="/members/{{ m.id }}" class="flex items-center gap-3">
+      <span class="avatar w-11 h-11 text-sm">{{ initials(m.first_name, m.last_name) }}</span>
+      <span class="flex-1 min-w-0">
+        <span class="block font-bold truncate">{{ full_name(m.first_name, m.last_name) }}</span>
+        <span class="block text-xs text-muted">{{ m.membership_no }} · {{ m.mobile }}</span>
+      </span>
+      {{ status_badge(m.status) }}
+    </a>
+    <div class="mt-3 pt-3 border-t border-zinc-100 flex items-center gap-4">
+      <div class="text-xs text-muted">Package<b class="block text-sm text-zinc-900">{{ m.package }}</b></div>
+      <div class="text-xs text-muted">Ends on<b class="block text-sm text-zinc-900">{{ m.end_date | short }}</b></div>
+      <div class="ml-auto flex gap-2">
+        <a href="tel:+91{{ m.mobile }}" class="btn-outline btn-icon" aria-label="Call {{ m.first_name }}">{{ icon("phone", "w-5 h-5") }}</a>
+        <a href="{{ member_wa_link(m) }}" target="_blank" rel="noopener" class="btn-wa btn-icon" aria-label="WhatsApp {{ m.first_name }}">{{ icon("whatsapp", "w-5 h-5") }}</a>
+      </div>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+
+{# ---------- pagination ---------- #}
+{% if pages > 1 %}
+{% set prev_cls = "btn-outline btn-icon" %}
+<nav class="mt-5 flex items-center justify-between gap-3" aria-label="Pages">
+  <p class="hidden md:block text-sm text-muted">Showing {{ (page - 1) * per_page + 1 }}–{{ [page * per_page, total] | min }} of {{ total }}</p>
+
+  {# mobile: ‹ Prev · Page x of y · Next › #}
+  <div class="md:hidden flex items-center justify-between w-full">
+    {% if page > 1 %}{% call list_link(members_url(q, status, page - 1), "btn-outline px-4") %}{{ icon("back", "w-4 h-4") }} Prev{% endcall %}
+    {% else %}<span class="btn-outline px-4 opacity-40">{{ icon("back", "w-4 h-4") }} Prev</span>{% endif %}
+    <span class="text-sm font-semibold text-muted">Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}{% call list_link(members_url(q, status, page + 1), "btn-dark px-4") %}Next {{ icon("next", "w-4 h-4") }}{% endcall %}
+    {% else %}<span class="btn-dark px-4 opacity-40">Next {{ icon("next", "w-4 h-4") }}</span>{% endif %}
+  </div>
+
+  {# desktop: numbered #}
+  <div class="hidden md:flex items-center gap-2">
+    {% if page > 1 %}{% call list_link(members_url(q, status, page - 1), prev_cls, "Previous page") %}{{ icon("back", "w-4 h-4") }}{% endcall %}{% endif %}
+    {% for n in page_numbers %}
+      {% if n is none %}<span class="px-1 text-muted">…</span>
+      {% elif n == page %}<span class="btn btn-icon bg-brand text-white" aria-current="page">{{ n }}</span>
+      {% else %}{% call list_link(members_url(q, status, n), "btn-outline btn-icon", "Page " ~ n) %}{{ n }}{% endcall %}{% endif %}
+    {% endfor %}
+    {% if page < pages %}{% call list_link(members_url(q, status, page + 1), prev_cls, "Next page") %}{{ icon("next", "w-4 h-4") }}{% endcall %}{% endif %}
+  </div>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="card p-10 text-center">
+  <div class="mx-auto w-14 h-14 rounded-full bg-zinc-100 text-zinc-500 grid place-items-center">{{ icon("search", "w-7 h-7") }}</div>
+  <p class="mt-4 font-semibold">No members found</p>
+  <p class="mt-1 text-sm text-muted">
+    {% if q or status %}Try another name or number.{% else %}Register your first member to see them here.{% endif %}
+  </p>
+  {% if q or status %}{% call list_link("/members", "btn-outline mt-5") %}Show all members{% endcall %}{% endif %}
+  {% if not q and not status %}<a href="/members/new" class="btn-primary mt-5">{{ icon("plus") }} New member</a>{% endif %}
+</div>
+{% endif %}

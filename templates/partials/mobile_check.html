@@ -1,0 +1,3 @@
+{# Soft warning under the mobile field when the number is already used. Saving is still allowed. #}
+{% from "partials/member_form.html" import dup_warning %}
+{{ dup_warning(duplicates) }}

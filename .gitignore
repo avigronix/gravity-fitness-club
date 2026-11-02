@@ -1,0 +1,29 @@
+# Secrets – each machine has its own .env (copy from .env.example)
+.env
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Member photos are data, not code (keep the empty folder)
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Docs, prompts and tests – not needed to run the app
+docs/
+PROMPT.md
+tests/
+test_*.py
+.pytest_cache/
+
+# Database backups
+*.dump
+backup*.sql
+
+# Editor / OS files
+.DS_Store
+.vscode/
+.idea/
+*.log

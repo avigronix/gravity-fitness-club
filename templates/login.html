@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon %}
+{% block title %}Login{% endblock %}
+
+{% block layout %}
+<div class="min-h-screen bg-white md:bg-page md:grid md:grid-cols-2">
+  {# brand side: black top on mobile, left half on desktop #}
+  <section class="bg-ink text-white flex flex-col items-center justify-center text-center
+                  px-6 pt-[calc(env(safe-area-inset-top)+40px)] pb-14 md:p-12">
+    <img src="/static/logo.jpg" alt="{{ gym_name }}" class="w-44 sm:w-56 md:w-80 rounded-lg">
+    <p class="mt-5 font-head font-semibold uppercase tracking-[.3em] text-zinc-300 md:text-white md:text-2xl md:tracking-[.15em]">
+      <span class="md:hidden">Admin Panel</span>
+      <span class="hidden md:inline">Member &amp; Fee Management</span>
+    </p>
+    <p class="hidden md:block mt-4 max-w-sm text-zinc-400 leading-relaxed">
+      Register members, track packages and send fee reminders on WhatsApp — all from one place.
+    </p>
+  </section>
+
+  {# form side: white rounded sheet on mobile, centered card on desktop #}
+  <section class="relative -mt-7 md:mt-0 rounded-t-[28px] md:rounded-none bg-white md:bg-transparent
+                  flex justify-center md:items-center px-6 pt-8 pb-[calc(env(safe-area-inset-bottom)+32px)] md:p-12">
+    <form method="post" action="/login" class="w-full max-w-sm md:max-w-md md:bg-white md:rounded-2xl md:p-10 md:shadow-xl md:shadow-black/5">
+      <h1 class="page-title">
+        <span class="md:hidden">Welcome back</span>
+        <span class="hidden md:inline">Admin login</span>
+      </h1>
+      <p class="mt-1 text-muted">Sign in to manage members and fees</p>
+
+      {% if error %}
+      <div class="mt-5 flex items-start gap-2 rounded-xl bg-[#FEE2E2] text-[#991B1B] px-3.5 py-3 text-sm font-medium" role="alert">
+        {{ icon("alert", "w-5 h-5") }}<span>{{ error }}</span>
+      </div>
+      {% endif %}
+
+      <label for="username" class="label mt-6">Username</label>
+      <input id="username" name="username" value="{{ username or '' }}" required autofocus
+             autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
+             placeholder="Enter username" class="input {{ 'input-error' if error }}">
+
+      <label for="password" class="label mt-4">Password</label>
+      <div class="relative">
+        <input id="password" name="password" type="password" required autocomplete="current-password"
+               placeholder="••••••••" class="input pr-12 {{ 'input-error' if error }}">
+        <button type="button" data-toggle-password="password" aria-label="Show password"
+                class="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 grid place-items-center text-zinc-500">
+          {{ icon("eye") }}
+        </button>
+      </div>
+
+      <label class="mt-4 flex items-center gap-2.5 min-h-[44px] text-sm cursor-pointer select-none">
+        <input type="checkbox" name="remember" value="1" class="w-5 h-5 accent-brand" checked>
+        Keep me signed in
+      </label>
+
+      <button class="btn-save w-full mt-3 !min-h-[52px] text-lg">Login</button>
+      <p class="mt-5 text-center text-xs text-muted">Only authorised gym staff can access this panel</p>
+    </form>
+  </section>
+</div>
+{% endblock %}

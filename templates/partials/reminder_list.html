@@ -1,0 +1,130 @@
+{# Swapped by HTMX on tab / chip change. Needs: rows, tab, show, counts, to_collect, sent_count, reminders_url, sent_label #}
+{% from "partials/ui.html" import icon, empty_state %}
+
+{% macro list_link(url, cls) -%}
+<a href="{{ url }}" hx-get="{{ url }}" hx-target="#reminder-list" hx-push-url="true" class="{{ cls }}">{{ caller() }}</a>
+{%- endmacro %}
+
+{% macro day_badge(r) -%}
+{% set left = r.end_date | days_left %}
+<span class="badge {{ 'badge-due' if left > 1 else 'badge-expired' }}">{{ r.end_date | days_label }}</span>
+{%- endmacro %}
+
+{# The link opens WhatsApp normally; app.js only logs the send in the background (no htmx here). #}
+{% macro send_button(r, cls="") -%}
+<a href="{{ r.link }}" target="_blank" rel="noopener" data-sent-url="/reminders/{{ r.id }}/sent" data-sent-for="{{ r.id }}"
+   class="{{ 'btn-sent' if r.last_reminder_at else 'btn-wa' }} {{ cls }}">
+  {{ icon("whatsapp", "w-4 h-4") }}<span data-sent-text>{{ "Sent · Resend" if r.last_reminder_at else "Send on WhatsApp" }}</span>
+</a>
+{%- endmacro %}
+
+{% macro mark_paid(r, cls="") -%}
+<a href="/members/{{ r.id }}?renew=1&back=reminders&tab={{ tab }}{{ '&show=all' if show }}" class="btn-outline {{ cls }}">Mark paid</a>
+{%- endmacro %}
+
+{# ---------- tabs (inside the black header area on mobile) ---------- #}
+<div class="-mx-4 -mt-4 px-4 pt-3 pb-4 bg-ink md:bg-transparent md:m-0 md:p-0 md:mb-4">
+  <div class="grid grid-cols-2 md:inline-flex gap-1 md:gap-2 p-1 md:p-0 rounded-2xl bg-white/10 md:bg-transparent">
+    {% for key, label in [("due", "Due in next " ~ reminder_days ~ " days"), ("expired", "Expired / unpaid")] %}
+    {% call list_link(reminders_url(key), "btn !min-h-[44px] px-4 text-[13px] md:text-sm " ~ ("bg-brand text-white" if tab == key else "text-zinc-300 md:text-zinc-900 md:bg-white md:border md:border-zinc-300")) %}
+      {{ label }} ({{ counts[key] }})
+    {% endcall %}
+    {% endfor %}
+  </div>
+</div>
+
+{% if tab == "expired" %}
+<div class="flex gap-2 mb-4">
+  {% for key, label, count in [("", "Last " ~ recent_days ~ " days", counts.expired), ("all", "All expired", counts.expired_all)] %}
+  {% call list_link(reminders_url("expired", key), "flex items-center min-h-[44px] px-4 rounded-full border text-sm font-semibold " ~ ("bg-ink text-white border-ink" if show == key else "bg-white border-zinc-300")) %}
+    {{ label }} · {{ count }}
+  {% endcall %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if rows %}
+{# ---------- summary ---------- #}
+<div class="card p-4 md:p-5 mb-4 flex items-center justify-between gap-4">
+  <div>
+    <p class="text-xs md:text-sm font-semibold text-muted">Fee to collect ({{ "next " ~ reminder_days ~ " days" if tab == "due" else ("all expired" if show else "expired, last " ~ recent_days ~ " days") }})</p>
+    <p class="font-head font-semibold text-3xl leading-tight">{{ to_collect | inr }}</p>
+  </div>
+  <p class="text-right text-sm text-muted leading-tight">
+    <span class="text-2xl font-bold text-zinc-900" data-sent-count>{{ sent_count }}</span> / {{ rows | length }}<br>reminders sent
+  </p>
+</div>
+
+<div class="xl:grid xl:grid-cols-[1fr_300px] xl:gap-5 xl:items-start">
+  {# ---------- desktop table ---------- #}
+  <div class="hidden lg:block card overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-ink text-white text-left">
+        <tr>
+          <th class="px-3 py-3 font-semibold">Member</th>
+          <th class="px-3 py-3 font-semibold">Ends on</th>
+          <th class="px-3 py-3 font-semibold">Renewal fee</th>
+          <th class="px-3 py-3 font-semibold">Reminder</th>
+          <th class="px-3 py-3"><span class="sr-only">Mark paid</span></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-zinc-100">
+        {% for r in rows %}
+        <tr data-preview-row data-message="{{ r.message }}" data-name="{{ full_name(r.first_name, r.last_name) }}"
+            class="cursor-pointer hover:bg-zinc-50 {{ 'bg-zinc-50' if loop.first }}" {% if loop.first %}aria-selected="true"{% endif %}>
+          <td class="px-3 py-3">
+            <a href="/members/{{ r.id }}" class="font-bold hover:text-brand">{{ full_name(r.first_name, r.last_name) }}</a>
+            <p class="text-xs text-muted">{{ r.membership_no }} · {{ r.package }}<br>{{ r.mobile }}</p>
+          </td>
+          <td class="px-3 py-3 whitespace-nowrap"><b>{{ r.end_date | dmy }}</b><br>{{ day_badge(r) }}</td>
+          <td class="px-3 py-3 font-bold whitespace-nowrap">{{ r.renewal_fee | inr }}</td>
+          <td class="px-3 py-3">
+            {{ send_button(r, "w-full px-3") }}
+            <p class="mt-1 text-xs text-muted text-center" data-sent-label="{{ r.id }}">{{ sent_label(r.last_reminder_at) }}</p>
+          </td>
+          <td class="px-3 py-3">{{ mark_paid(r, "px-3") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# ---------- message preview (desktop) ---------- #}
+  <aside class="hidden xl:block card p-5 sticky top-6">
+    <h2 class="section-title">Message preview</h2>
+    <p class="text-sm text-muted mt-1">Opens pre-filled in WhatsApp for <b data-preview-name>{{ full_name(rows[0].first_name, rows[0].last_name) }}</b>. Click a row to see its message.</p>
+    <p class="mt-4 rounded-2xl rounded-tl-sm bg-[#DCF8C6] px-4 py-3 text-sm leading-relaxed whitespace-pre-line" data-preview-text>{{ rows[0].message }}</p>
+  </aside>
+
+  {# ---------- mobile cards ---------- #}
+  <ul class="lg:hidden grid md:grid-cols-2 gap-3">
+    {% for r in rows %}
+    {% set left = r.end_date | days_left %}
+    <li class="card p-4 border-t-4 {{ 'border-[#F59E0B]' if left > 1 else 'border-brand' }}">
+      <div class="flex items-start justify-between gap-3">
+        <a href="/members/{{ r.id }}" class="min-w-0">
+          <p class="font-bold text-lg truncate">{{ full_name(r.first_name, r.last_name) }}</p>
+          <p class="text-xs text-muted">{{ r.membership_no }} · {{ r.package }}</p>
+        </a>
+        <div class="text-right shrink-0">
+          <p class="font-head font-semibold text-2xl leading-none">{{ r.renewal_fee | inr }}</p>
+          <div class="mt-1.5">{{ day_badge(r) }}</div>
+        </div>
+      </div>
+      <p class="mt-3 flex items-center gap-2 text-sm text-muted">
+        {{ icon("calendar", "w-4 h-4") }} Package {{ "ended" if left < 0 else "ends" }} <b class="text-zinc-900">{{ r.end_date | dmy }}</b>
+      </p>
+      <p class="mt-1 text-xs text-muted" data-sent-label="{{ r.id }}">{{ sent_label(r.last_reminder_at) }}</p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        {{ send_button(r, "flex-1 min-w-[190px] !min-h-[50px] text-base") }}
+        {{ mark_paid(r, "flex-1 !min-h-[50px] px-5") }}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+
+{% else %}
+{{ empty_state("All clear – no pending reminders",
+               "No package ends in the next " ~ reminder_days ~ " days." if tab == "due" else "No expired members in this list.") }}
+{% endif %}

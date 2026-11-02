@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon, mobile_bar %}
+{% block title %}All Members{% endblock %}
+
+{% block mobile_header %}
+<header class="md:hidden bg-ink text-white px-4 pt-[calc(env(safe-area-inset-top)+14px)] pb-1">
+  {{ mobile_bar("Members") }}
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="hidden md:flex items-end justify-between gap-4 mb-5">
+  <h1 class="page-title">All Members</h1>
+  <a href="/members/new" class="btn-primary px-5">{{ icon("plus") }} New Member</a>
+</div>
+
+{# search: on mobile it sits inside the black header area #}
+<div class="-mx-4 -mt-4 px-4 pt-3 pb-4 bg-ink md:bg-transparent md:m-0 md:p-0 md:mb-4">
+  <form action="/members" role="search" hx-get="/members" hx-target="#members-list" hx-push-url="true"
+        hx-include="#status-input" class="relative">
+    <label for="q" class="sr-only">Search members</label>
+    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none">{{ icon("search") }}</span>
+    <input id="q" name="q" type="search" value="{{ q }}" autocomplete="off" enterkeyhint="search"
+           placeholder="Name, mobile or GFC no."
+           hx-get="/members" hx-trigger="input changed delay:400ms, search" hx-target="#members-list"
+           hx-push-url="true" hx-include="#status-input" hx-sync="closest form:replace"
+           class="input pl-11 bg-white/10 border-white/10 text-white placeholder:text-zinc-400 focus:bg-white focus:text-zinc-900
+                  md:bg-white md:text-zinc-900 md:border-zinc-300">
+  </form>
+</div>
+
+<div id="members-list" class="mt-4 md:mt-0">
+  {% include "partials/members_list.html" %}
+</div>
+{% endblock %}
