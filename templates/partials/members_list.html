@@ -6,6 +6,16 @@
    class="{{ cls }}" {% if label %}aria-label="{{ label }}"{% endif %}>{{ caller() }}</a>
 {%- endmacro %}
 
+{# Owner only: deletes the member with all payments (app.js asks to confirm first). #}
+{% macro delete_button(m) -%}
+{% if is_admin %}
+<form method="post" action="/members/{{ m.id }}/delete"
+      data-confirm="Delete {{ full_name(m.first_name, m.last_name) }} ({{ m.membership_no }})? All payments of this member are deleted too. This cannot be undone.">
+  <button class="btn-outline btn-icon text-brand" aria-label="Delete {{ full_name(m.first_name, m.last_name) }}">{{ icon("trash", "w-4 h-4") }}</button>
+</form>
+{% endif %}
+{%- endmacro %}
+
 <input type="hidden" id="status-input" name="status" value="{{ status }}">
 
 {# ---------- filter chips (counts follow the search) ---------- #}
@@ -55,6 +65,7 @@
           <div class="flex gap-2">
             <a href="/members/{{ m.id }}" class="btn-outline btn-icon" aria-label="View {{ full_name(m.first_name, m.last_name) }}">{{ icon("eye", "w-4 h-4") }}</a>
             <a href="{{ member_wa_link(m) }}" target="_blank" rel="noopener" class="btn-wa btn-icon" aria-label="WhatsApp {{ full_name(m.first_name, m.last_name) }}">{{ icon("whatsapp", "w-4 h-4") }}</a>
+            {{ delete_button(m) }}
           </div>
         </td>
       </tr>
@@ -75,12 +86,14 @@
       </span>
       {{ status_badge(m.status) }}
     </a>
-    <div class="mt-3 pt-3 border-t border-zinc-100 flex items-center gap-4">
+    {# wraps: on narrow 2-column cards the buttons move to their own line instead of spilling out #}
+    <div class="mt-3 pt-3 border-t border-zinc-100 flex flex-wrap items-center gap-x-4 gap-y-3">
       <div class="text-xs text-muted">Package<b class="block text-sm text-zinc-900">{{ m.package }}</b></div>
       <div class="text-xs text-muted">Ends on<b class="block text-sm text-zinc-900">{{ m.end_date | short }}</b></div>
       <div class="ml-auto flex gap-2">
         <a href="tel:+91{{ m.mobile }}" class="btn-outline btn-icon" aria-label="Call {{ m.first_name }}">{{ icon("phone", "w-5 h-5") }}</a>
         <a href="{{ member_wa_link(m) }}" target="_blank" rel="noopener" class="btn-wa btn-icon" aria-label="WhatsApp {{ m.first_name }}">{{ icon("whatsapp", "w-5 h-5") }}</a>
+        {{ delete_button(m) }}
       </div>
     </div>
   </li>

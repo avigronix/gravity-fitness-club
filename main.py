@@ -621,6 +621,19 @@ def edit(request: Request, member_id: int, form=Depends(form_data)):
     return redirect(f"/members/{member_id}")
 
 
+@router.post("/members/{member_id:int}/delete", dependencies=[Depends(admin_only)])
+def delete_member(request: Request, member_id: int):
+    """Owner only. Payments go with the member (ON DELETE CASCADE), photo file too."""
+    member = member_or_redirect(request, member_id)
+    if member:
+        db.execute("DELETE FROM members WHERE id = %s", (member_id,))
+        for photo in UPLOAD_DIR.glob(f"{member_id}.*"):
+            photo.unlink()
+        flash(request, f"{utils.full_name(member['first_name'], member['last_name'])} "
+                       f"({member['membership_no']}) deleted with all payments")
+    return redirect(request.session.get("members_url", "/members"))
+
+
 def renew_member(member_id: int, v: dict, package: dict) -> tuple[date, date] | None:
     """Payment + new period in ONE transaction. None if the member was renewed meanwhile
     (double tap / second tab): the form's current_end no longer matches."""
