@@ -131,7 +131,8 @@ The receptionist can also change their own password after login (More → Change
 ## 4. Testing (what to check by hand)
 
 1. Open `/` without logging in → you land on `/login`. Wrong password → red error; 5 wrong tries → blocked 10 minutes.
-2. **New Registration**: 1 Month from 31 Oct shows end date 30 Nov; save → member page with one payment row.
+2. **New Registration**: 1 Month from 31 Oct fills end date 30 Nov (can be changed by hand); save → receipt
+   (Print / PDF), then *Done* → member page with one payment row. Renew works the same way (start + end date).
 3. **All Members**: search by name / full name / mobile / GFC-0001 / 1, filter chips, pages; refresh and Back keep the view.
 4. **Payment Reminders**: Due / Expired tabs, "Send on WhatsApp" opens WhatsApp and the button turns grey "Sent · Resend";
    "Mark paid" → renew → back on the same tab, row gone, badge count lower.
@@ -152,6 +153,27 @@ The receptionist can also change their own password after login (More → Change
       (Windows: Task Scheduler with `pg_dump -U postgres -d gym_admin -F c -f D:\backups\gym.dump`).
       Back up `static/uploads/` (member photos) too.
 - [ ] Check package prices: `SELECT name, price FROM packages;` (change with the queries in `db/common_queries.sql`).
+
+### Security on the live server
+
+Built into the app: login on every page, owner / receptionist roles, 5 wrong passwords → 10 min block
+(real visitor IP is taken from nginx's `X-Real-IP`), bcrypt passwords, signed session cookie (`SameSite=Lax`),
+form posts from other websites are rejected (Origin check), `X-Frame-Options: DENY`, `nosniff`,
+member photos only through `/photos/…` after login (`/static/uploads/…` always gives 404), plain SQL with parameters only.
+
+On the server:
+
+- [ ] **HTTPS** – without it passwords travel in plain text over Wi-Fi / mobile data.
+      `sudo certbot --nginx -d <your-domain>`, then `COOKIE_SECURE=true` in `.env` and restart.
+- [ ] **nginx must not serve photos**: inside the `server { }` block, *above* `location /static/`, add
+      `location /static/uploads/ { return 404; }` then `sudo nginx -t && sudo systemctl reload nginx`.
+- [ ] **App only on localhost**: run uvicorn with `--host 127.0.0.1` (nginx in front), and
+      `sudo ufw allow OpenSSH && sudo ufw allow 'Nginx Full' && sudo ufw enable` – nothing else open
+      (PostgreSQL 5432 and the app port stay closed to the internet).
+- [ ] **Change passwords that were ever shared** (chat, WhatsApp): the DB user
+      (`ALTER USER gym WITH PASSWORD '…'` + `.env`), the owner login and every receptionist login.
+- [ ] Daily backup (above) copied off the server too, e.g. to Google Drive once a week.
+- [ ] `sudo apt update && sudo apt upgrade` regularly (or `sudo apt install unattended-upgrades`).
 
 ## 6. Files
 

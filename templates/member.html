@@ -40,7 +40,7 @@
 </div>
 {% endif %}
 <form method="post" action="/members/{{ m.id }}/edit" enctype="multipart/form-data" novalidate data-submit-once class="space-y-4 md:space-y-5">
-  {{ personal_card(v, errors, duplicates, photo_url=("/static/uploads/" ~ m.photo) if m.photo else "", exclude_id=m.id) }}
+  {{ personal_card(v, errors, duplicates, photo_url=("/photos/" ~ m.photo) if m.photo else "", exclude_id=m.id) }}
   {{ body_card(v, errors) }}
   {{ medical_card(v, errors) }}
   <p class="text-sm text-muted px-1">Package, dates and fee change only through <b>Renew / Mark paid</b>{{ " (owner login)" if not is_admin }}.</p>
@@ -60,7 +60,7 @@
 <section class="card p-4 md:p-6">
   <div class="flex items-center gap-4">
     {% if m.photo %}
-    <img src="/static/uploads/{{ m.photo }}" alt="Photo of {{ member_name }}" class="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover shrink-0">
+    <img src="/photos/{{ m.photo }}" alt="Photo of {{ member_name }}" class="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover shrink-0">
     {% else %}
     <div class="avatar w-20 h-20 md:w-24 md:h-24 rounded-2xl text-2xl">{{ initials(m.first_name, m.last_name) }}</div>
     {% endif %}
@@ -183,7 +183,11 @@
       {{ select("mode", "Payment mode", pay_modes, rv, renew_errors) }}
     </div>
 
-    {{ field("start_date", "Start date", rv, renew_errors, type="date", required=True, cls="mt-4") }}
+    <div class="grid grid-cols-2 gap-4 mt-4">
+      {{ field("start_date", "Start date", rv, renew_errors, type="date", required=True) }}
+      {# filled from package + start date by app.js; can be changed by hand #}
+      {{ field("end_date", "End date (auto)", rv, renew_errors, type="date", required=True, attrs='data-end-input') }}
+    </div>
 
     <div class="mt-4 rounded-xl bg-zinc-100 px-4 py-3 text-sm">
       <p class="text-muted">New period</p>

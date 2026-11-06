@@ -6,10 +6,10 @@ import re
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import APIRouter, Depends, FastAPI, Form, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException
@@ -78,6 +78,26 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(SessionMiddleware, secret_key=utils.SECRET_KEY, max_age=utils.REMEMBER_DAYS * 86400,
                    same_site="lax", https_only=utils.COOKIE_SECURE)
+SECURITY_HEADERS = {"X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin"}
+
+
+@app.middleware("http")
+async def security(request: Request, call_next):
+    """Blocks form posts sent from other websites (CSRF) and adds safe browser headers."""
+    origin = request.headers.get("origin")
+    if request.method == "POST" and origin and urlsplit(origin).netloc != request.headers.get("host"):
+        return Response("Request blocked: it did not come from this site.", status_code=403)
+    response = await call_next(request)
+    response.headers.update(SECURITY_HEADERS)
+    return response
+
+
+@app.get("/static/uploads/{name:path}", include_in_schema=False)
+def no_public_photos(name: str):
+    """Member photos are private – shown through /photos/<file> after login (registered before the mount)."""
+    raise HTTPException(status_code=404)
+
+
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 def user_context(request: Request) -> dict:
@@ -364,6 +384,15 @@ INSERT_PAYMENT = """
     VALUES (%(member_id)s, %(package_id)s, %(fee)s, %(mode)s, %(start_date)s, %(end_date)s)"""
 
 
+@router.get("/photos/{name}")
+def photo(name: str):
+    """Member photo, only for logged-in staff."""
+    path = UPLOAD_DIR / name
+    if not re.fullmatch(r"\d+\.(jpg|png|webp)", name) or not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(path, headers={"Cache-Control": "private, no-cache"})
+
+
 def save_photo(conn, member_id: int, data: bytes, ext: str):
     name = f"{member_id}.{ext}"
     for old in UPLOAD_DIR.glob(f"{member_id}.*"):   # replace an older photo of any type
@@ -558,8 +587,9 @@ def member_form_values(member: dict) -> dict:
 
 
 def renew_defaults(member: dict) -> dict:
+    start = utils.renewal_start(member["end_date"])
     return {"package_id": str(member["package_id"]), "fee": str(member["renewal_fee"]), "mode": "Cash",
-            "start_date": utils.renewal_start(member["end_date"]).isoformat()}
+            "start_date": start.isoformat(), "end_date": utils.end_date(start, member["months"]).isoformat()}
 
 
 def safe_return_url(url: str) -> str:
@@ -658,8 +688,12 @@ def renew_member(member_id: int, v: dict, package: dict) -> tuple[date, date] | 
             return None
         # start date picked in the renew sheet; default = day after the old end (or today)
         start = to_date(v["start_date"]) or utils.renewal_start(row["end_date"])
-        params ={"member_id": member_id, "package_id": package["id"], "fee": int(v["fee"]),
-                  "mode": v["mode"], "start_date": start, "end_date": utils.end_date(start, package["months"])}
+        # end date: filled in automatically in the sheet but may be changed; empty -> package rule
+        end = to_date(v["end_date"]) or utils.end_date(start, package["months"])
+        if end < start:
+            end = utils.end_date(start, package["months"])
+        params = {"member_id": member_id, "package_id": package["id"], "fee": int(v["fee"]),
+                  "mode": v["mode"], "start_date": start, "end_date": end}
         conn.execute(INSERT_PAYMENT, params)
         conn.execute("""UPDATE members SET package_id = %(package_id)s, start_date = %(start_date)s,
                                end_date = %(end_date)s, fee = %(fee)s, last_reminder_at = NULL
@@ -675,6 +709,9 @@ def renew(request: Request, member_id: int, form=Depends(form_data)):
     packages = get_packages()
     v, errors = clean_payment(form, packages, with_start="start_date" in form)
     v["current_end"] = str(form.get("current_end") or "")
+    v["end_date"], end_error = clean_end_date(form, v)
+    if end_error:
+        errors["end_date"] = end_error
     return_to = safe_return_url(str(form.get("return_to") or ""))
     if errors:
         return member_page(request, member, 400, return_to=return_to, rv=v, renew_errors=errors,
@@ -778,6 +815,15 @@ def reminder_sent(member_id: int):
 
 # ---------- login / logout ----------
 
+def client_ip(request: Request) -> str:
+    """Real visitor IP for the login limit. Behind nginx on the same server every request comes
+    from 127.0.0.1, so then trust nginx's X-Real-IP (outsiders cannot connect from 127.0.0.1)."""
+    host = request.client.host if request.client else ""
+    if host in ("127.0.0.1", "::1"):
+        return request.headers.get("x-real-ip", host)
+    return host
+
+
 @app.get("/login")
 def login_page(request: Request):
     if utils.is_logged_in(request.session):
@@ -789,7 +835,7 @@ def login_page(request: Request):
 def login(request: Request, username: str = Form(""), password: str = Form(""),
           remember: str = Form("")):
     username = username.strip()
-    keys = ["user:" + username.lower(), "ip:" + (request.client.host if request.client else "")]
+    keys = ["user:" + username.lower(), "ip:" + client_ip(request)]
     wait = utils.login_blocked_seconds(keys)
     if wait:
         return render(request, "login.html", status_code=429, username=username,
