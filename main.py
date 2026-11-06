@@ -377,7 +377,7 @@ def create_member(v: dict, package: dict, photo: bytes | None, ext: str | None) 
     start = to_date(v["start_date"])
     params = member_params(v) | {
         "package_id": package["id"], "start_date": start, "fee": int(v["fee"]),
-        "end_date": utils.end_date(start, package["months"]), "mode": v["mode"],
+        "end_date": to_date(v["end_date"]) or utils.end_date(start, package["months"]), "mode": v["mode"],
     }
     with db.connection() as conn:
         member = conn.execute(INSERT_MEMBER, params).fetchone()
@@ -394,13 +394,25 @@ def register_defaults(packages: list[dict]) -> dict:
     return {k: "" for k in MEMBER_FIELDS} | {
         "package_id": str(first["id"]), "fee": str(first["price"]), "mode": "Cash",
         "start_date": utils.today().isoformat(), "sugar": "No", "blood_pressure": "No", "rules": "",
+        "end_date": utils.end_date(utils.today(), first["months"]).isoformat(),
     }
+
+
+def clean_end_date(form, v: dict) -> tuple[str, str | None]:
+    """End date is filled in automatically but may be changed. Empty -> package rule on save."""
+    text = str(form.get("end_date") or "").strip()
+    end, start = to_date(text), to_date(v["start_date"])
+    if text and not end:
+        return text, "Enter a valid end date"
+    if end and start and end < start:
+        return text, "End date cannot be before the start date"
+    return text, None
 
 
 def register_page(request: Request, v: dict, errors: dict, status_code: int = 200):
     packages = get_packages()
     package, start = find_package(packages, v["package_id"]), to_date(v["start_date"])
-    end = utils.end_date(start, package["months"]) if package and start else None
+    end = to_date(v["end_date"]) or (utils.end_date(start, package["months"]) if package and start else None)
     duplicates = members_with_mobile(v["mobile"]) if len(v["mobile"]) == 10 else []
     return render(request, "register.html", nav="register", status_code=status_code,
                   v=v, errors=errors, packages=packages, package=package, end=end,
@@ -418,6 +430,9 @@ def register(request: Request, form=Depends(form_data)):
     v, errors = clean_member(form)
     pay, pay_errors = clean_payment(form, packages)
     v, errors = v | pay | {"rules": form.get("rules") or ""}, errors | pay_errors
+    v["end_date"], end_error = clean_end_date(form, v)
+    if end_error:
+        errors["end_date"] = end_error
     if not v["rules"]:
         errors["rules"] = "Member must accept the gym rules"
     photo, ext, photo_error = read_photo(form.get("photo"))

@@ -106,7 +106,7 @@
 {%- endmacro %}
 
 {# Package radio cards. data-* feed the end-date / fee preview in app.js #}
-{% macro package_cards(packages, v, errors, cols="md:grid-cols-4") -%}
+{% macro package_cards(packages, v, errors, cols="md:grid-cols-3 xl:grid-cols-5") -%}
 <div class="grid grid-cols-2 {{ cols }} gap-3">
   {% for p in packages %}
   <label class="cursor-pointer">

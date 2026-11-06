@@ -85,29 +85,41 @@ function formatRupees(value) {
   return "₹" + (parseInt(value, 10) || 0).toLocaleString("en-IN");
 }
 
-function updatePackageForm(form, fillFee) {
+function parseIso(text) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text || "")) return null;
+  const [y, m, d] = text.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function isoDate(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+// fillFee / fillEnd: package or start date was changed -> refill fee / end date
+// (register's end date input can then still be changed by hand)
+function updatePackageForm(form, fillFee, fillEnd) {
   const pkg = form.querySelector("input[name=package_id]:checked");
-  // register and renew forms both have a start date input
-  const startText = form.querySelector("[name=start_date]")?.value;
+  const start = parseIso(form.querySelector("[name=start_date]")?.value);
   const fee = form.querySelector("[data-fee-input]");
+  const endInput = form.querySelector("[data-end-input]");
   if (pkg && fillFee && fee) fee.value = pkg.dataset.price;
   form.querySelectorAll("[data-package-name]").forEach((el) => (el.textContent = pkg ? pkg.dataset.name : ""));
   form.querySelectorAll("[data-fee-display]").forEach((el) => (el.textContent = formatRupees(fee?.value)));
-  let start = "", end = "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(startText || "")) {
-    const [y, m, d] = startText.split("-").map(Number);
-    start = formatDate(new Date(y, m - 1, d));
-    if (pkg) end = formatDate(packageEndDate(new Date(y, m - 1, d), Number(pkg.dataset.months)));
+  let end = pkg && start ? packageEndDate(start, Number(pkg.dataset.months)) : null;
+  if (endInput) {
+    if (fillEnd && end) endInput.value = isoDate(end);
+    end = parseIso(endInput.value);
   }
-  form.querySelectorAll("[data-start-date]").forEach((el) => (el.textContent = start || "—"));
-  form.querySelectorAll("[data-end-date]").forEach((el) => (el.textContent = end || "—"));
+  form.querySelectorAll("[data-start-date]").forEach((el) => (el.textContent = start ? formatDate(start) : "—"));
+  form.querySelectorAll("[data-end-date]").forEach((el) => (el.textContent = end ? formatDate(end) : "—"));
 }
 
 document.addEventListener("change", (e) => {
   const form = e.target.closest("[data-package-form]");
   if (form && ["package_id", "start_date"].includes(e.target.name)) {
-    updatePackageForm(form, e.target.name === "package_id");
+    updatePackageForm(form, e.target.name === "package_id", true);
   }
+  if (form && e.target.name === "end_date") updatePackageForm(form, false, false);
 
   // Photo preview before upload
   if (e.target.matches("[data-photo-input]")) {
@@ -148,7 +160,8 @@ function shrinkPhoto(input, file) {
 
 document.addEventListener("input", (e) => {
   const form = e.target.closest("[data-package-form]");
-  if (form && e.target.matches("[data-fee-input], [name=start_date]")) updatePackageForm(form, false);
+  if (form && e.target.matches("[data-fee-input], [name=end_date]")) updatePackageForm(form, false, false);
+  if (form && e.target.matches("[name=start_date]")) updatePackageForm(form, false, true);
 });
 
 function renewSummary(form) {
@@ -207,7 +220,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const flash = document.querySelector("[data-flash]");
   if (flash) setTimeout(() => flash.remove(), 4000);
 
-  document.querySelectorAll("[data-package-form]").forEach((form) => updatePackageForm(form, false));
+  // keep the server's values on load (e.g. a hand-changed end date after a form error)
+  document.querySelectorAll("[data-package-form]").forEach((form) => updatePackageForm(form, false, false));
   restorePageScroll();
 
   // e.g. renew sheet re-opened with errors, or opened from "Mark paid"

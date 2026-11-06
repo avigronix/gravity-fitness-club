@@ -37,10 +37,8 @@
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5">
       {{ field("start_date", "Start date", v, errors, type="date", required=True) }}
-      <div>
-        <span class="label">End date (auto)</span>
-        <div class="input bg-zinc-100 border-zinc-200 flex items-center font-bold" data-end-date>{{ end | dmy }}</div>
-      </div>
+      {# filled from package + start date by app.js; can be changed by hand #}
+      {{ field("end_date", "End date (auto)", v, errors, type="date", required=True, attrs='data-end-input') }}
       {{ field("fee", "Fee (₹)", v, errors, type="number", required=True, attrs='inputmode="numeric" min="0" data-fee-input') }}
       {{ select("mode", "Payment mode", pay_modes, v, errors) }}
     </div>
